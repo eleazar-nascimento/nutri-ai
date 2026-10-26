@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.65)",
     alignItems: "center",
     justifyContent: "center",

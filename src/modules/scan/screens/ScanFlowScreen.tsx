@@ -429,12 +429,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cameraBgImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: "100%",
     height: "100%",
   },
   darkOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   topBarOverlay: {
