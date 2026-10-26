@@ -4,3 +4,4 @@ import { SettingsFlowScreen } from "@/modules/settings";
 export default function SettingsRoute() {
   return <SettingsFlowScreen />;
 }
+
