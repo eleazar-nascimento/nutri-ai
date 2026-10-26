@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Nutri AI - Rastreador de Calorias",
+    "slug": "nutri-ai-food-calorie-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nutriai",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#121212"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
+
