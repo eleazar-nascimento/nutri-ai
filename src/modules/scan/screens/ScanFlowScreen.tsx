@@ -611,3 +611,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.grayscale[400],
   },
 });
+
