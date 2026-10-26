@@ -13,7 +13,7 @@ export default function HomeRoute() {
     if (tab === "analysis") router.push("/analysis" as any);
     if (tab === "scan") router.push("/scan" as any);
     if (tab === "diet") router.push("/diets" as any);
-    if (tab === "settings") router.push("/style-guide" as any);
+    if (tab === "settings") router.push("/settings" as any);
   };
 
   return (

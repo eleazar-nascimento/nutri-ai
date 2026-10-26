@@ -18,6 +18,7 @@ const NAV_ITEMS: PortfolioNavItem[] = [
   { label: "6. Análise", route: "/analysis" },
   { label: "7. Scan IA", route: "/scan" },
   { label: "8. Dietas", route: "/diets" },
+  { label: "9. Ajustes", route: "/settings" },
   { label: "Style Guide", route: "/style-guide" },
 ];
 
