@@ -39,6 +39,7 @@ import {
   MessageModalCard,
   DatePickerCard,
   ShareSheetCard,
+  PortfolioNavBar,
 } from "@/components/ui";
 
 type GuideSection =
@@ -147,6 +148,7 @@ export default function StyleGuideScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.grayscale[600] }}>
+      <PortfolioNavBar />
       <View
         style={{
           flex: 1,
