@@ -6,6 +6,7 @@ import {
   Image,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
 } from "react-native";
 import { colors, radii } from "@/theme";
@@ -95,19 +96,20 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
   const laserAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(laserAnim, {
           toValue: 1,
           duration: 1800,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(laserAnim, {
           toValue: 0,
           duration: 1800,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );

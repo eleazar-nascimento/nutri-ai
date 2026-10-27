@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, Animated, Easing } from "react-native";
+import { View, StyleSheet, Animated, Easing, Platform } from "react-native";
 import Svg, { Path, Circle } from "react-native-svg";
 import { colors, radii } from "@/theme";
 import { AppText, MacroIcon } from "@/components/ui";
@@ -83,18 +83,19 @@ export const CalorieGaugeCard: React.FC<CalorieGaugeCardProps> = ({
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     Animated.sequence([
       Animated.timing(pulseAnim, {
         toValue: 1.08,
         duration: 160,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(pulseAnim, {
         toValue: 1,
         duration: 240,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
   }, [caloriesLeft, progressPercent, pulseAnim]);

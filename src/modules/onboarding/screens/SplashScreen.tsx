@@ -3,6 +3,7 @@ import {
   View,
   Animated,
   Easing,
+  Platform,
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
@@ -37,18 +38,19 @@ export const SplashScreenView: React.FC<SplashScreenProps> = ({
   const ctaOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     Animated.spring(logoAnim, {
       toValue: 1,
       friction: 6,
       tension: 50,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
 
     Animated.timing(ctaOpacity, {
       toValue: 1,
       duration: 700,
       delay: 900,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
 
     const pulseLoop = Animated.loop(
@@ -57,13 +59,13 @@ export const SplashScreenView: React.FC<SplashScreenProps> = ({
           toValue: 1.07,
           duration: 1100,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(badgePulse, {
           toValue: 1,
           duration: 1100,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );

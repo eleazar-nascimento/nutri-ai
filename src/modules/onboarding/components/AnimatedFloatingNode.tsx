@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import {
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleProp,
   ViewStyle,
@@ -43,6 +44,7 @@ export const AnimatedFloatingNode: React.FC<AnimatedFloatingNodeProps> = ({
   const tapScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     entrance.setValue(0);
 
     const entranceSpring = Animated.sequence([
@@ -51,7 +53,7 @@ export const AnimatedFloatingNode: React.FC<AnimatedFloatingNodeProps> = ({
         toValue: 1,
         friction: 6,
         tension: 55,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]);
 
@@ -61,13 +63,13 @@ export const AnimatedFloatingNode: React.FC<AnimatedFloatingNodeProps> = ({
           toValue: 1,
           duration: floatDuration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
           duration: floatDuration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );
@@ -78,13 +80,13 @@ export const AnimatedFloatingNode: React.FC<AnimatedFloatingNodeProps> = ({
           toValue: 1,
           duration: floatDuration * 1.15,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(rotateAnim, {
           toValue: 0,
           duration: floatDuration * 1.15,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );
@@ -101,18 +103,19 @@ export const AnimatedFloatingNode: React.FC<AnimatedFloatingNodeProps> = ({
   }, [delay, floatDuration, entrance, floatAnim, rotateAnim]);
 
   const handlePress = () => {
+    const useNativeDriver = Platform.OS !== "web";
     Animated.sequence([
       Animated.spring(tapScale, {
         toValue: 1.18,
         friction: 4,
         tension: 140,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(tapScale, {
         toValue: 1,
         friction: 5,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
     onPress?.();

@@ -3,6 +3,7 @@ import {
   View,
   Animated,
   Easing,
+  Platform,
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
@@ -203,29 +204,31 @@ export const OnboardingScreenView: React.FC<OnboardingScreenProps> = ({
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     contentAnim.setValue(0);
     Animated.spring(contentAnim, {
       toValue: 1,
       friction: 7,
       tension: 55,
-      useNativeDriver: true,
+      useNativeDriver,
     }).start();
   }, [stepIndex, contentAnim]);
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== "web";
     const arrowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(arrowNudge, {
           toValue: 6,
           duration: 650,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(arrowNudge, {
           toValue: 0,
           duration: 650,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ])
     );
@@ -234,18 +237,19 @@ export const OnboardingScreenView: React.FC<OnboardingScreenProps> = ({
   }, [arrowNudge]);
 
   const handleNext = () => {
+    const useNativeDriver = Platform.OS !== "web";
     Animated.sequence([
       Animated.spring(buttonScale, {
         toValue: 0.9,
         friction: 5,
         tension: 160,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.spring(buttonScale, {
         toValue: 1,
         friction: 4,
         tension: 120,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
 
