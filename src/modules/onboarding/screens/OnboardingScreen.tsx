@@ -503,15 +503,12 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    minHeight: 840,
-    alignSelf: "center",
     justifyContent: "space-between",
     overflow: "hidden",
   },
   topControlsRow: {
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

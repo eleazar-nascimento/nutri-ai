@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import Svg, { Path, Line, Circle } from "react-native-svg";
 import { colors, radii } from "@/theme";
@@ -10,13 +10,14 @@ import {
   BottomMenu,
   BottomMenuTab,
 } from "@/components/ui";
+import { useAccount, todayKey, totalsForDay, macroEnergySplit } from "@/store";
 
 export interface AnalysisScreenProps {
   onBack?: () => void;
   onNavigateTab?: (tab: BottomMenuTab) => void;
 }
 
-const PERIOD_DATA = [
+const PERIOD_PATHS = [
   {
     // Diário
     orangePath:
@@ -25,10 +26,6 @@ const PERIOD_DATA = [
       "M 8 66 C 48 76, 82 58, 120 64 C 158 70, 194 46, 234 56 C 260 62, 274 50, 286 52",
     underText: "5 dias dentro da meta",
     overText: "2 dias acima em mais de 200 kcal",
-    fats: "53%",
-    carbs: "28%",
-    protein: "19%",
-    note: "Seu consumo de proteína está consistentemente baixo.",
   },
   {
     // Semanal
@@ -38,10 +35,6 @@ const PERIOD_DATA = [
       "M 8 58 C 46 62, 86 50, 122 54 C 160 58, 198 44, 236 48 C 262 50, 276 46, 286 44",
     underText: "6 dias dentro da meta",
     overText: "1 dia acima em mais de 150 kcal",
-    fats: "38%",
-    carbs: "34%",
-    protein: "28%",
-    note: "Ótimo progresso semanal! Sua proteína subiu 9%.",
   },
   {
     // Mensal
@@ -51,10 +44,6 @@ const PERIOD_DATA = [
       "M 8 64 C 44 60, 84 56, 124 52 C 162 50, 200 48, 238 46 C 264 44, 276 44, 286 42",
     underText: "24 dias dentro da meta",
     overText: "6 dias acima em mais de 200 kcal",
-    fats: "32%",
-    carbs: "38%",
-    protein: "30%",
-    note: "Equilíbrio consistente de macronutrientes neste mês.",
   },
 ];
 
@@ -68,8 +57,54 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
   onBack,
   onNavigateTab,
 }) => {
+  const account = useAccount();
   const [periodIndex, setPeriodIndex] = useState(0);
-  const currentData = PERIOD_DATA[periodIndex];
+
+  const currentPathData = PERIOD_PATHS[periodIndex];
+
+  // Agregação de macros a partir das refeições na store
+  const macroStats = useMemo(() => {
+    const today = todayKey();
+    let totalCarbs = 0;
+    let totalProtein = 0;
+    let totalFat = 0;
+    let totalCalories = 0;
+
+    if (periodIndex === 0) {
+      // Diário: hoje
+      const totals = totalsForDay(account.meals, today);
+      totalCarbs = totals.carbs;
+      totalProtein = totals.protein;
+      totalFat = totals.fat;
+      totalCalories = totals.calories;
+    } else {
+      // Semanal ou Mensal: soma todas as refeições disponíveis no histórico
+      account.meals.forEach((m) => {
+        totalCarbs += m.carbs;
+        totalProtein += m.protein;
+        totalFat += m.fat;
+        totalCalories += m.calories;
+      });
+    }
+
+    if (totalCalories === 0) {
+      // Fallback para metas se nenhum dado estiver disponível
+      totalCarbs = account.goals.carbsGrams;
+      totalProtein = account.goals.proteinGrams;
+      totalFat = account.goals.fatGrams;
+    }
+
+    const split = macroEnergySplit(totalCarbs, totalProtein, totalFat);
+    return {
+      fats: `${Math.round(split.fatPercent)}%`,
+      carbs: `${Math.round(split.carbsPercent)}%`,
+      protein: `${Math.round(split.proteinPercent)}%`,
+      note:
+        split.proteinPercent >= 25
+          ? "Excelente equilíbrio protéico para retenção de massa magra!"
+          : "Considere aumentar o consumo de proteínas para bater sua meta diária.",
+    };
+  }, [account.meals, account.goals, periodIndex]);
 
   return (
     <View style={styles.screenContainer}>
@@ -86,7 +121,7 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
           onRightPress={onBack}
         />
 
-        {/* Banner Verde (#45C588 - 388x128) */}
+        {/* Banner Verde (#45C588) */}
         <View style={styles.greenBanner}>
           <AppText variant="title3" color={colors.grayscale[100]}>
             Sua Análise Nutricional
@@ -96,21 +131,21 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
           </AppText>
         </View>
 
-        {/* Abas Diário / Semanal / Mensal (Tab/3 388x49) */}
+        {/* Abas Diário / Semanal / Mensal */}
         <SegmentedTabs
           tabs={["Diário", "Semanal", "Mensal"]}
           activeIndex={periodIndex}
           onChange={setPeriodIndex}
         />
 
-        {/* Card Lilás (#DDC0FF - 388x273): Tendência de Calorias */}
+        {/* Card Lilás (#DDC0FF): Tendência de Calorias */}
         <View style={styles.calorieTrendsCard}>
           <AppText variant="title3" color={colors.grayscale[600]}>
             Tendência de Calorias
           </AppText>
 
           <View style={styles.chartRow}>
-            {/* Eixo Y (400, 300, 200, 100) */}
+            {/* Eixo Y */}
             <View style={styles.yAxisColumn}>
               {Y_LABELS.map((lbl) => (
                 <AppText
@@ -139,18 +174,18 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                   />
                 ))}
 
-                {/* Linha Meta Preta (Vector 9) */}
+                {/* Linha Meta Preta */}
                 <Path
-                  d={currentData.blackPath}
+                  d={currentPathData.blackPath}
                   fill="none"
                   stroke={colors.grayscale[600]}
                   strokeWidth={2.5}
                   strokeLinecap="round"
                 />
 
-                {/* Linha Calorias Coral (Vector 8 - #FF6F43) */}
+                {/* Linha Calorias Coral */}
                 <Path
-                  d={currentData.orangePath}
+                  d={currentPathData.orangePath}
                   fill="none"
                   stroke={colors.accent[400]}
                   strokeWidth={3}
@@ -191,7 +226,7 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                 ]}
               />
               <AppText variant="footnote" color={colors.grayscale[600]}>
-                {currentData.underText}
+                {currentPathData.underText}
               </AppText>
             </View>
 
@@ -207,20 +242,20 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                 color={colors.grayscale[600]}
                 style={{ maxWidth: 150 }}
               >
-                {currentData.overText}
+                {currentPathData.overText}
               </AppText>
             </View>
           </View>
         </View>
 
-        {/* Card Amarelo (#F5F378 - 388x198): Distribuição de Macros */}
+        {/* Card Amarelo (#F5F378): Distribuição de Macros */}
         <View style={styles.macroDistributionCard}>
           <View style={{ gap: 2 }}>
             <AppText variant="title3" color={colors.grayscale[600]}>
               Distribuição de Macros
             </AppText>
             <AppText variant="body2" color={colors.grayscale[600]}>
-              {currentData.note}
+              {macroStats.note}
             </AppText>
           </View>
 
@@ -236,7 +271,7 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                 Gorduras
               </AppText>
               <AppText variant="title2" color={colors.grayscale[600]}>
-                {currentData.fats}
+                {macroStats.fats}
               </AppText>
             </View>
 
@@ -251,7 +286,7 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                 Carbos
               </AppText>
               <AppText variant="title2" color={colors.grayscale[600]}>
-                {currentData.carbs}
+                {macroStats.carbs}
               </AppText>
             </View>
 
@@ -266,7 +301,7 @@ export const AnalysisScreenView: React.FC<AnalysisScreenProps> = ({
                 Proteínas
               </AppText>
               <AppText variant="title2" color={colors.grayscale[600]}>
-                {currentData.protein}
+                {macroStats.protein}
               </AppText>
             </View>
           </View>
@@ -287,8 +322,6 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
   },
   scrollContent: {
@@ -299,29 +332,27 @@ const styles = StyleSheet.create({
   },
   greenBanner: {
     width: "100%",
-    minHeight: 128,
+    backgroundColor: colors.accent[300],
     borderRadius: radii.xl,
-    backgroundColor: colors.accent[300], // #45C588
     padding: 20,
-    justifyContent: "center",
     gap: 6,
   },
   calorieTrendsCard: {
     width: "100%",
+    backgroundColor: colors.accent[100],
     borderRadius: radii.xl,
-    backgroundColor: colors.accent[100], // #DDC0FF
-    padding: 20,
+    padding: 18,
     gap: 14,
   },
   chartRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
   },
   yAxisColumn: {
-    height: 104,
     justifyContent: "space-between",
-    paddingVertical: 4,
+    height: 106,
+    paddingVertical: 2,
   },
   graphBody: {
     flex: 1,
@@ -334,35 +365,36 @@ const styles = StyleSheet.create({
   },
   legendRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(18,18,18,0.15)",
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   legendDot: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   macroDistributionCard: {
     width: "100%",
+    backgroundColor: colors.accent[200],
     borderRadius: radii.xl,
-    backgroundColor: colors.accent[200], // #F5F378
-    padding: 20,
-    gap: 14,
+    padding: 18,
+    gap: 16,
   },
   macroBoxesRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: 10,
   },
   macroMiniBox: {
     flex: 1,
-    height: 88,
+    height: 90,
     borderRadius: radii.lg,
     padding: 12,
     justifyContent: "space-between",
@@ -375,4 +407,3 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
-

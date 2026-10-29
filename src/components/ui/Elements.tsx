@@ -429,10 +429,10 @@ export const PaymentMethodCard: React.FC<{
  */
 export const DietCard: React.FC<{
   title?: string;
-  calories?: string;
-  protein?: string;
-  carbs?: string;
-  fat?: string;
+  calories?: string | number;
+  protein?: string | number;
+  carbs?: string | number;
+  fat?: string | number;
   imageUri?: string;
   favorited?: boolean;
   onFavoriteToggle?: () => void;
@@ -448,6 +448,12 @@ export const DietCard: React.FC<{
   onFavoriteToggle,
   onPress,
 }) => {
+  const calStr = typeof calories === "number" ? `${calories} kcal` : calories;
+  const protStr =
+    typeof protein === "number" ? `Proteína: ${protein}g` : protein;
+  const carbsStr = typeof carbs === "number" ? `Carbo: ${carbs}g` : carbs;
+  const fatStr = typeof fat === "number" ? `Gordura: ${fat}g` : fat;
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -494,7 +500,7 @@ export const DietCard: React.FC<{
           }}
         >
           <AppText variant="footnote" color={colors.grayscale[100]}>
-            {calories}
+            {calStr}
           </AppText>
           <View
             style={{
@@ -504,7 +510,7 @@ export const DietCard: React.FC<{
             }}
           />
           <AppText variant="footnote" color={colors.grayscale[100]}>
-            {protein}
+            {protStr}
           </AppText>
           <View
             style={{
@@ -514,7 +520,7 @@ export const DietCard: React.FC<{
             }}
           />
           <AppText variant="footnote" color={colors.grayscale[100]}>
-            {carbs}
+            {carbsStr}
           </AppText>
           <View
             style={{
@@ -524,7 +530,7 @@ export const DietCard: React.FC<{
             }}
           />
           <AppText variant="footnote" color={colors.grayscale[100]}>
-            {fat}
+            {fatStr}
           </AppText>
         </View>
       </View>

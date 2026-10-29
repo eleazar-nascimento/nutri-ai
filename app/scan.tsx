@@ -1,28 +1,18 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "@/theme";
-import { PortfolioNavBar } from "@/components/ui";
+import { Screen } from "@/components/layout";
 import { ScanFlowScreenView } from "@/modules/scan";
 
 export default function ScanRoute() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.root}>
-      <PortfolioNavBar />
+    <Screen>
       <ScanFlowScreenView
         onBack={() => router.push("/home" as any)}
-        onAddToDiet={() => router.push("/diets" as any)}
+        onAddToDiet={() => router.push("/home" as any)}
+        onOpenPremium={() => router.push("/premium" as any)}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-});
-

@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from "react-native";
+import { Sparkles } from "lucide-react-native";
 import { colors, radii } from "@/theme";
 import {
   AppText,
@@ -17,83 +18,58 @@ import {
   TopBar,
   ActionIcon,
   Button,
+  MessageModalCard,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
+import {
+  useAppStore,
+  useAccount,
+  SCAN_DISHES,
+  todayKey,
+  FREE_SCANS_PER_DAY,
+  ratio,
+} from "@/store";
 
 export type ScanSubScreen = "31_scanning" | "32_scan_result";
 export type ScanMode = "camera" | "barcode" | "gallery";
 
-const DETECTED_FOODS = [
-  {
-    name: "Tiras de Frango Grelhado",
-    calories: "280 kcal",
-    protein: "Proteína: 42g",
-    carbs: "Carbo: 4g",
-    fat: "Gordura: 9g",
-  },
-  {
-    name: "Pão Naan Artesanal",
-    calories: "210 kcal",
-    protein: "Proteína: 7g",
-    carbs: "Carbo: 38g",
-    fat: "Gordura: 4g",
-  },
-  {
-    name: "Pimentões Salteados (Vermelho e Amarelo)",
-    calories: "130 kcal",
-    protein: "Proteína: 3g",
-    carbs: "Carbo: 14g",
-    fat: "Gordura: 7g",
-  },
-];
-
-const SCAN_MACROS = [
-  {
-    name: "Carbos",
-    current: "50%",
-    max: "100%",
-    progress: 0.5,
-    bg: colors.accent[200], // #F5F378
-  },
-  {
-    name: "Proteínas",
-    current: "83%",
-    max: "100%",
-    progress: 0.83,
-    bg: colors.accent[300], // #45C588
-  },
-  {
-    name: "Calorias",
-    current: "620 kcal",
-    max: "100%",
-    progress: 0.65,
-    bg: colors.accent[100], // #DDC0FF
-  },
-  {
-    name: "Gorduras",
-    current: "38%",
-    max: "100%",
-    progress: 0.38,
-    bg: colors.accent[400], // #FF6F43
-  },
+const SCAN_PILLS: { key: ScanSubScreen; label: string }[] = [
+  { key: "31_scanning", label: "31. Câmera IA" },
+  { key: "32_scan_result", label: "32. Resultado do Scan" },
 ];
 
 export interface ScanFlowScreenProps {
   onBack?: () => void;
   onAddToDiet?: () => void;
+  onOpenPremium?: () => void;
 }
 
 /**
- * Módulo 7 — 31_Scanning & 32_Scan Result (Figma Nodes 63000:2106 & 63001:2834)
+ * Módulo 7 — 31_Scanning & 32_Scan Result
  */
 export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
   onBack,
   onAddToDiet,
+  onOpenPremium,
 }) => {
+  const { demoMode, addMeal } = useAppStore();
+  const account = useAccount();
+
   const [subScreen, setSubScreen] = useState<ScanSubScreen>("31_scanning");
   const [scanMode, setScanMode] = useState<ScanMode>("camera");
+  const [dishIndex, setDishIndex] = useState(0);
   const [favorited, setFavorited] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const laserAnim = useRef(new Animated.Value(0)).current;
+
+  const currentDish = SCAN_DISHES[dishIndex % SCAN_DISHES.length];
+  const isPremium = account.subscription.plan !== "none";
+
+  // Conta quantos scans já foram feitos hoje
+  const todayScansCount = account.meals.filter(
+    (m) => m.dateKey === todayKey() && m.source === "scan"
+  ).length;
 
   useEffect(() => {
     const useNativeDriver = Platform.OS !== "web";
@@ -117,52 +93,73 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
     return () => loop.stop();
   }, [laserAnim]);
 
+  const handleShutterPress = () => {
+    if (!isPremium && todayScansCount >= FREE_SCANS_PER_DAY && !demoMode) {
+      setShowLimitModal(true);
+      return;
+    }
+    setSubScreen("32_scan_result");
+  };
+
+  const handleCycleDish = () => {
+    setDishIndex((idx) => (idx + 1) % SCAN_DISHES.length);
+  };
+
+  const handleAddDishToTracker = () => {
+    addMeal({
+      dateKey: todayKey(),
+      name: currentDish.name,
+      source: "scan",
+      calories: currentDish.calories,
+      carbs: currentDish.carbs,
+      protein: currentDish.protein,
+      fat: currentDish.fat,
+      imageUri: currentDish.imageUri,
+    });
+    onAddToDiet?.();
+  };
+
+  const scanMacros = [
+    {
+      name: "Carbos",
+      current: `${currentDish.carbs}g`,
+      max: `${account.goals.carbsGrams}g`,
+      progress: ratio(currentDish.carbs, account.goals.carbsGrams),
+      bg: colors.accent[200],
+    },
+    {
+      name: "Proteínas",
+      current: `${currentDish.protein}g`,
+      max: `${account.goals.proteinGrams}g`,
+      progress: ratio(currentDish.protein, account.goals.proteinGrams),
+      bg: colors.accent[300],
+    },
+    {
+      name: "Calorias",
+      current: `${currentDish.calories} kcal`,
+      max: `${account.goals.caloriesGoal} kcal`,
+      progress: ratio(currentDish.calories, account.goals.caloriesGoal),
+      bg: colors.accent[100],
+    },
+    {
+      name: "Gorduras",
+      current: `${currentDish.fat}g`,
+      max: `${account.goals.fatGrams}g`,
+      progress: ratio(currentDish.fat, account.goals.fatGrams),
+      bg: colors.accent[400],
+    },
+  ];
+
   return (
     <View style={styles.screenContainer}>
       <StatusBarMock variant="white" />
 
-      {/* Seletor rápido entre 31_Scanning e 32_Scan Result */}
-      <View style={styles.subNavWrapper}>
-        <View style={styles.subNavRow}>
-          <TouchableOpacity
-            onPress={() => setSubScreen("31_scanning")}
-            style={[
-              styles.subPill,
-              subScreen === "31_scanning" && styles.subPillActive,
-            ]}
-          >
-            <AppText
-              variant="footnote"
-              color={
-                subScreen === "31_scanning"
-                  ? colors.grayscale[600]
-                  : colors.grayscale[200]
-              }
-            >
-              31. Escaneando (Câmera IA)
-            </AppText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setSubScreen("32_scan_result")}
-            style={[
-              styles.subPill,
-              subScreen === "32_scan_result" && styles.subPillActive,
-            ]}
-          >
-            <AppText
-              variant="footnote"
-              color={
-                subScreen === "32_scan_result"
-                  ? colors.grayscale[600]
-                  : colors.grayscale[200]
-              }
-            >
-              32. Resultado do Scan
-            </AppText>
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Pílulas de etapas (visíveis apenas no Modo Demo) */}
+      <DemoStepPills
+        steps={SCAN_PILLS}
+        active={subScreen}
+        onChange={(k: ScanSubScreen) => setSubScreen(k)}
+      />
 
       {/* TELA 31 — SCANNING (63000:2106) */}
       {subScreen === "31_scanning" && (
@@ -170,9 +167,7 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
           {/* Visor com imagem da refeição */}
           <View style={styles.viewfinderContainer}>
             <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop&q=80",
-              }}
+              source={{ uri: currentDish.imageUri }}
               style={styles.cameraBgImage}
               resizeMode="cover"
             />
@@ -188,12 +183,22 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
               />
             </View>
 
-            {/* Moldura de Foco 341x340 com Cantoneiras Brancas */}
+            {/* Banner de prato detectável & troca rápida */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleCycleDish}
+              style={styles.dishCyclePill}
+            >
+              <Sparkles size={14} color={colors.accent[200]} />
+              <AppText variant="caption2" color={colors.grayscale[100]}>
+                Foco: {currentDish.name} (Tocar p/ alternar)
+              </AppText>
+            </TouchableOpacity>
+
+            {/* Moldura de Foco 310x330 */}
             <View style={styles.focusFrame}>
               <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop&q=80",
-                }}
+                source={{ uri: currentDish.imageUri }}
                 style={styles.focusedInnerImage}
                 resizeMode="cover"
               />
@@ -213,7 +218,7 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
                       {
                         translateY: laserAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [20, 290],
+                          outputRange: [20, 270],
                         }),
                       },
                     ],
@@ -223,7 +228,7 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
             </View>
           </View>
 
-          {/* Painel Inferior #121212 com 3 Modos e Botão Disparador 56x56 */}
+          {/* Painel Inferior com 3 Modos e Botão Disparador */}
           <View style={styles.cameraBottomPanel}>
             <View style={styles.modesRow}>
               {(
@@ -273,10 +278,10 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
               })}
             </View>
 
-            {/* Botão Disparador (Shutter 56x56) */}
+            {/* Botão Disparador */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setSubScreen("32_scan_result")}
+              onPress={handleShutterPress}
               style={styles.shutterOuter}
             >
               <View style={styles.shutterInner} />
@@ -293,12 +298,10 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
           contentContainerStyle={{ paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Imagem Superior do Prato (351px) + TopBar */}
+          {/* Imagem Superior do Prato + TopBar */}
           <View style={styles.resultHeroContainer}>
             <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop&q=80",
-              }}
+              source={{ uri: currentDish.imageUri }}
               style={styles.resultHeroImage}
               resizeMode="cover"
             />
@@ -313,11 +316,20 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
             </View>
           </View>
 
-          {/* Conteúdo Nutricional (#121212) */}
+          {/* Conteúdo Nutricional */}
           <View style={styles.resultBody}>
-            {/* Grade 2x2 de Macros (184x100 cada) */}
+            <View style={{ gap: 4 }}>
+              <AppText variant="title2" color={colors.grayscale[100]}>
+                {currentDish.name}
+              </AppText>
+              <AppText variant="body2" color={colors.grayscale[200]}>
+                Prato reconhecido com 98% de precisão pelo modelo NutriAI.
+              </AppText>
+            </View>
+
+            {/* Grade 2x2 de Macros */}
             <View style={styles.nutrientGrid}>
-              {SCAN_MACROS.map((item) => (
+              {scanMacros.map((item) => (
                 <View
                   key={item.name}
                   style={[styles.nutrientCard, { backgroundColor: item.bg }]}
@@ -331,7 +343,7 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
                       <View
                         style={[
                           styles.nutrientBarFill,
-                          { width: `${item.progress * 100}%` },
+                          { width: `${Math.min(100, item.progress * 100)}%` },
                         ]}
                       />
                     </View>
@@ -340,7 +352,7 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
                         {item.current}
                       </AppText>
                       <AppText variant="footnote" color={colors.grayscale[600]}>
-                        {item.max}
+                        Meta: {item.max}
                       </AppText>
                     </View>
                   </View>
@@ -348,9 +360,12 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
               ))}
             </View>
 
-            {/* Lista de Alimentos Identificados (Food Items 388x86) */}
+            {/* Lista de Ingredientes Identificados */}
             <View style={{ gap: 12 }}>
-              {DETECTED_FOODS.map((food) => (
+              <AppText variant="headline" color={colors.grayscale[100]}>
+                Ingredientes Detectados
+              </AppText>
+              {currentDish.items.map((food) => (
                 <View key={food.name} style={styles.foodItemCard}>
                   <AppText variant="headline" color={colors.grayscale[100]}>
                     {food.name}
@@ -358,19 +373,19 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
 
                   <View style={styles.foodNutritionRow}>
                     <AppText variant="footnote" color={colors.grayscale[200]}>
-                      {food.calories}
+                      {food.calories} kcal
                     </AppText>
                     <View style={styles.foodDivider} />
                     <AppText variant="footnote" color={colors.grayscale[200]}>
-                      {food.protein}
+                      P: {food.protein}g
                     </AppText>
                     <View style={styles.foodDivider} />
                     <AppText variant="footnote" color={colors.grayscale[200]}>
-                      {food.carbs}
+                      C: {food.carbs}g
                     </AppText>
                     <View style={styles.foodDivider} />
                     <AppText variant="footnote" color={colors.grayscale[200]}>
-                      {food.fat}
+                      G: {food.fat}g
                     </AppText>
                   </View>
                 </View>
@@ -378,13 +393,33 @@ export const ScanFlowScreenView: React.FC<ScanFlowScreenProps> = ({
             </View>
 
             <Button
-              title="Adicionar à Minha Dieta"
+              title="Registrar no Diário de Hoje"
               variant="primary"
               size="large"
-              onPress={onAddToDiet}
+              onPress={handleAddDishToTracker}
             />
           </View>
         </ScrollView>
+      )}
+
+      {/* Modal de Limite de Scans Gratuitos */}
+      {showLimitModal && (
+        <View style={styles.modalBackdrop}>
+          <View style={{ width: "100%", paddingHorizontal: 20 }}>
+            <MessageModalCard
+              mode="dualAction"
+              title="Limite Gratuito Atingido"
+              subtitle={`Você atingiu os ${FREE_SCANS_PER_DAY} scans gratuitos diários. Faça upgrade para o Premium para escanear sem limites!`}
+              primaryLabel="Ver Planos Premium"
+              secondaryLabel="Fechar"
+              onPrimaryPress={() => {
+                setShowLimitModal(false);
+                onOpenPremium?.();
+              }}
+              onSecondaryPress={() => setShowLimitModal(false)}
+            />
+          </View>
+        </View>
       )}
     </View>
   );
@@ -394,29 +429,7 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
-  },
-  subNavWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
-  subNavRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  subPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-  },
-  subPillActive: {
-    backgroundColor: colors.accent[200],
-    borderColor: colors.accent[200],
   },
   cameraScreen: {
     flex: 1,
@@ -446,13 +459,27 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10,
   },
+  dishCyclePill: {
+    position: "absolute",
+    top: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(18,18,18,0.75)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.grayscale[400],
+    zIndex: 10,
+  },
   focusFrame: {
-    width: 310,
-    height: 330,
+    width: 300,
+    height: 310,
     borderRadius: 24,
     overflow: "hidden",
     position: "relative",
-    marginTop: 44,
+    marginTop: 48,
   },
   focusedInnerImage: {
     width: "100%",
@@ -502,8 +529,9 @@ const styles = StyleSheet.create({
   },
   cameraBottomPanel: {
     backgroundColor: colors.grayscale[600],
-    paddingTop: 18,
     paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
     alignItems: "center",
     gap: 18,
   },
@@ -515,30 +543,30 @@ const styles = StyleSheet.create({
   },
   modeCard: {
     flex: 1,
-    height: 78,
+    height: 60,
     borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 4,
   },
   shutterOuter: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 4,
     borderColor: colors.grayscale[100],
     alignItems: "center",
     justifyContent: "center",
   },
   shutterInner: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.grayscale[100],
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary[100],
   },
   resultHeroContainer: {
     width: "100%",
-    height: 310,
+    height: 340,
     position: "relative",
   },
   resultHeroImage: {
@@ -547,29 +575,25 @@ const styles = StyleSheet.create({
   },
   resultTopBarOverlay: {
     position: "absolute",
-    top: 12,
+    top: 10,
     left: 20,
     right: 20,
   },
   resultBody: {
-    marginTop: -24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: colors.grayscale[600],
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 18,
     gap: 20,
   },
   nutrientGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 14,
+    rowGap: 12,
   },
   nutrientCard: {
     width: "48%",
     height: 100,
-    borderRadius: 20,
+    borderRadius: radii.xl,
     padding: 14,
     justifyContent: "space-between",
   },
@@ -577,40 +601,41 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 6,
     borderRadius: 3,
-    backgroundColor: "rgba(18,18,18,0.22)",
+    backgroundColor: "rgba(18,18,18,0.20)",
     overflow: "hidden",
   },
   nutrientBarFill: {
     height: "100%",
-    borderRadius: 3,
     backgroundColor: colors.grayscale[600],
+    borderRadius: 3,
   },
   nutrientLabelsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   foodItemCard: {
-    width: "100%",
-    minHeight: 86,
-    borderRadius: 20,
     backgroundColor: colors.grayscale[500],
+    borderRadius: radii.lg,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.grayscale[400],
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    justifyContent: "center",
     gap: 6,
   },
   foodNutritionRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 8,
   },
   foodDivider: {
     width: 1,
-    height: 14,
+    height: 12,
     backgroundColor: colors.grayscale[400],
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  },
 });
-

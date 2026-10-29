@@ -14,6 +14,7 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from "lucide-react-native";
 import { colors, radii } from "@/theme";
 import {
@@ -27,15 +28,30 @@ import {
   BottomMenu,
   BottomMenuTab,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
 import {
   CalorieGaugeCard,
   MacroProgressCard,
 } from "../components/CalorieGaugeCard";
+import {
+  useAppStore,
+  useAccount,
+  todayKey,
+  totalsForDay,
+  ratio,
+  DIET_CATALOG,
+} from "@/store";
 
 export type HomeSubScreen =
   | "23_home"
   | "24_notification_empty"
   | "25_notification_list";
+
+const SUB_SCREEN_PILLS: { key: HomeSubScreen; label: string }[] = [
+  { key: "23_home", label: "23. Home" },
+  { key: "24_notification_empty", label: "24. Notif. Vazio" },
+  { key: "25_notification_list", label: "25. Notificações" },
+];
 
 const WEEKDAY_SHORT_PT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MONTHS_PT = [
@@ -53,107 +69,8 @@ const MONTHS_PT = [
   "Dezembro",
 ];
 
-interface DailyNutritionEntry {
-  caloriesGoal: number;
-  caloriesConsumed: number;
-  carbsGrams: number;
-  carbsGoal: number;
-  proteinGrams: number;
-  proteinGoal: number;
-  planTitle: string;
-  planCalories: string;
-  planProtein: string;
-  planCarbs: string;
-  planFat: string;
-  planImage: string;
-}
-
-const DAILY_PLANS = [
-  {
-    planTitle: "Vitalidade Vegana",
-    planCalories: "2.000 kcal",
-    planProtein: "Proteína: 125g",
-    planCarbs: "Carbo: 300g",
-    planFat: "Gordura: 55g",
-    planImage:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    planTitle: "Partida Cetogênica (Keto)",
-    planCalories: "1.850 kcal",
-    planProtein: "Proteína: 140g",
-    planCarbs: "Carbo: 45g",
-    planFat: "Gordura: 115g",
-    planImage:
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    planTitle: "Estilo Mediterrâneo",
-    planCalories: "2.100 kcal",
-    planProtein: "Proteína: 130g",
-    planCarbs: "Carbo: 210g",
-    planFat: "Gordura: 70g",
-    planImage:
-      "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80",
-  },
-  {
-    planTitle: "Hiperproteica Magra",
-    planCalories: "2.250 kcal",
-    planProtein: "Proteína: 185g",
-    planCarbs: "Carbo: 190g",
-    planFat: "Gordura: 65g",
-    planImage:
-      "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80",
-  },
-];
-
-/**
- * Gera dados nutricionais determinísticos e variados para qualquer data do calendário.
- * O dia 11 de Outubro mantém exatamente os números originais do Figma (1672 restantes, 72%, 140g Carbos, 60g Proteínas).
- */
-function getBaseNutritionForDate(
-  year: number,
-  month: number,
-  day: number
-): DailyNutritionEntry {
-  if (month === 9 && day === 11) {
-    return {
-      caloriesGoal: 2200,
-      caloriesConsumed: 528, // 2200 - 528 = 1672 restantes
-      carbsGrams: 140,
-      carbsGoal: 200,
-      proteinGrams: 60,
-      proteinGoal: 120,
-      ...DAILY_PLANS[0],
-    };
-  }
-
-  const seed = year * 372 + month * 31 + day;
-  const caloriesGoal = 2200;
-  // Varia entre 350 e 1920 kcal consumidas
-  const caloriesConsumed = 350 + ((seed * 173) % 1570);
-  const carbsGoal = 200;
-  const carbsGrams = 55 + ((seed * 47) % 140);
-  const proteinGoal = 120;
-  const proteinGrams = 38 + ((seed * 29) % 80);
-  const plan = DAILY_PLANS[seed % DAILY_PLANS.length];
-
-  return {
-    caloriesGoal,
-    caloriesConsumed,
-    carbsGrams,
-    carbsGoal,
-    proteinGrams,
-    proteinGoal,
-    ...plan,
-  };
-}
-
-/**
- * Retorna o índice do dia da semana (0 = Seg ... 6 = Dom)
- */
 function getMondayBasedWeekday(year: number, month: number, day: number): number {
-  const jsDay = new Date(year, month, day).getDay(); // 0 = Dom .. 6 = Sáb
+  const jsDay = new Date(year, month, day).getDay();
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
@@ -161,45 +78,53 @@ function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-const NOTIFICATIONS_PT = [
-  "Hora do seu almoço – Não esqueça de registrar sua refeição.",
-  "Você está indo muito bem! Tente adicionar alimentos ricos em fibras para bater a meta de hoje.",
-  "Você atingiu 80% da sua meta diária de calorias — continue assim!",
-  "Mantenha-se hidratado! Tente beber pelo menos 8 copos de água hoje.",
-  "Considere um lanche leve para ajudar a manter seus níveis de energia.",
-  "Revise seu progresso desta semana e comemore suas pequenas conquistas!",
-  "Planeje seu jantar com antecedência — escolher opções saudáveis pode ser divertido!",
-];
-
 export interface HomeAndNotificationsScreenProps {
   onOpenPremium?: () => void;
   onNavigateTab?: (tab: BottomMenuTab) => void;
 }
 
 /**
- * Telas 23_Home, 24_Notification-Empty e 25_Notification (Figma Nodes 62993:4376, 62998:2366, 62998:2748)
+ * Telas 23_Home, 24_Notification-Empty e 25_Notification
  */
 export const HomeAndNotificationsScreenView: React.FC<
   HomeAndNotificationsScreenProps
 > = ({ onOpenPremium, onNavigateTab }) => {
+  const {
+    demoMode,
+    addMeal,
+    removeMeal,
+    toggleFavoriteDiet,
+    clearNotifications,
+  } = useAppStore();
+  const account = useAccount();
+
   const [subScreen, setSubScreen] = useState<HomeSubScreen>("23_home");
 
-  // Estado do calendário funcional (Padrão: 11 de Outubro de 2026)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(9); // 9 = Outubro (0-indexed)
-  const [selectedDay, setSelectedDay] = useState(11);
+  // Data inicial: data de hoje (ou dia 11 de outubro no modo demo/fallback)
+  const initialDate = useMemo(() => {
+    const today = new Date();
+    return {
+      year: today.getFullYear(),
+      month: today.getMonth(),
+      day: today.getDate(),
+    };
+  }, []);
+
+  const [currentYear, setCurrentYear] = useState(initialDate.year);
+  const [currentMonth, setCurrentMonth] = useState(initialDate.month);
+  const [selectedDay, setSelectedDay] = useState(initialDate.day);
   const [showMonthCalendar, setShowMonthCalendar] = useState(false);
 
-  // Ajustes extras adicionados pelo usuário por data (ex.: "+ Refeição")
-  const [customDeltas, setCustomDeltas] = useState<
-    Record<string, { calories: number; carbs: number; protein: number }>
-  >({});
+  const selectedDateKey = useMemo(() => {
+    const m = String(currentMonth + 1).padStart(2, "0");
+    const d = String(selectedDay).padStart(2, "0");
+    return `${currentYear}-${m}-${d}`;
+  }, [currentYear, currentMonth, selectedDay]);
 
-  const [dietFav, setDietFav] = useState(false);
+  const todayDateKey = todayKey();
+  const isTodaySelected = selectedDateKey === todayDateKey;
 
-  const dateKey = `${currentYear}-${currentMonth}-${selectedDay}`;
-
-  // Calcula os 7 dias da semana contendo o `selectedDay`
+  // Dias da semana contendo a data selecionada
   const weekDaysStrip = useMemo(() => {
     const weekdayIndex = getMondayBasedWeekday(
       currentYear,
@@ -218,60 +143,52 @@ export const HomeAndNotificationsScreenView: React.FC<
         mondayDate.getMonth(),
         mondayDate.getDate() + i
       );
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dayStr = String(d.getDate()).padStart(2, "0");
+      const key = `${d.getFullYear()}-${m}-${dayStr}`;
+
       return {
         label: WEEKDAY_SHORT_PT[i],
         year: d.getFullYear(),
         month: d.getMonth(),
         day: d.getDate(),
-        dateStr: String(d.getDate()).padStart(2, "0"),
+        dateStr: dayStr,
+        dateKey: key,
       };
     });
   }, [currentYear, currentMonth, selectedDay]);
 
-  // Dados nutricionais calculados para a data selecionada + incrementos interativos
+  // Refeições do dia selecionado
+  const dayMeals = useMemo(() => {
+    return account.meals.filter((m) => m.dateKey === selectedDateKey);
+  }, [account.meals, selectedDateKey]);
+
+  // Totais do dia selecionado calculados a partir da store
   const activeNutrition = useMemo(() => {
-    const base = getBaseNutritionForDate(
-      currentYear,
-      currentMonth,
-      selectedDay
-    );
-    const delta = customDeltas[dateKey] ?? {
-      calories: 0,
-      carbs: 0,
-      protein: 0,
-    };
+    const totals = totalsForDay(account.meals, selectedDateKey);
+    const goals = account.goals;
 
-    const totalConsumed = Math.min(
-      base.caloriesGoal,
-      Math.max(0, base.caloriesConsumed + delta.calories)
-    );
-    const caloriesLeft = Math.max(0, base.caloriesGoal - totalConsumed);
-
-    // No dia 11 de Outubro sem delta, mantém 72% fiel ao Figma
-    const progressPercent =
-      currentMonth === 9 && selectedDay === 11 && delta.calories === 0
-        ? 72
-        : Math.min(100, Math.round((totalConsumed / base.caloriesGoal) * 100));
-
-    const carbsGrams = Math.min(
-      base.carbsGoal,
-      Math.max(0, base.carbsGrams + delta.carbs)
-    );
-    const proteinGrams = Math.min(
-      base.proteinGoal,
-      Math.max(0, base.proteinGrams + delta.protein)
+    const caloriesLeft = Math.max(0, goals.caloriesGoal - totals.calories);
+    const progressPercent = Math.min(
+      100,
+      Math.round(ratio(totals.calories, goals.caloriesGoal) * 100)
     );
 
     return {
-      ...base,
+      caloriesConsumed: totals.calories,
+      caloriesGoal: goals.caloriesGoal,
       caloriesLeft,
       progressPercent,
-      carbsGrams,
-      carbsProgress: carbsGrams / base.carbsGoal,
-      proteinGrams,
-      proteinProgress: proteinGrams / base.proteinGoal,
+      carbsGrams: totals.carbs,
+      carbsGoal: goals.carbsGrams,
+      carbsProgress: ratio(totals.carbs, goals.carbsGrams),
+      proteinGrams: totals.protein,
+      proteinGoal: goals.proteinGrams,
+      proteinProgress: ratio(totals.protein, goals.proteinGrams),
+      fatGrams: totals.fat,
+      fatGoal: goals.fatGrams,
     };
-  }, [currentYear, currentMonth, selectedDay, customDeltas, dateKey]);
+  }, [account.meals, account.goals, selectedDateKey]);
 
   const handleSelectFullDate = (year: number, month: number, day: number) => {
     setCurrentYear(year);
@@ -299,32 +216,23 @@ export const HomeAndNotificationsScreenView: React.FC<
   };
 
   const handleLogQuickMeal = (
+    type: "snack" | "meal",
     calories: number,
     carbs: number,
-    protein: number
+    protein: number,
+    fat: number
   ) => {
-    setCustomDeltas((prev) => {
-      const curr = prev[dateKey] ?? { calories: 0, carbs: 0, protein: 0 };
-      return {
-        ...prev,
-        [dateKey]: {
-          calories: curr.calories + calories,
-          carbs: curr.carbs + carbs,
-          protein: curr.protein + protein,
-        },
-      };
+    addMeal({
+      dateKey: selectedDateKey,
+      name: type === "snack" ? "Lanche Rápido" : "Refeição Completa",
+      source: "quick",
+      calories,
+      carbs,
+      protein,
+      fat,
     });
   };
 
-  const handleResetDay = () => {
-    setCustomDeltas((prev) => {
-      const next = { ...prev };
-      delete next[dateKey];
-      return next;
-    });
-  };
-
-  // Matriz do calendário mensal expandido
   const monthCalendarGrid = useMemo(() => {
     const daysCount = getDaysInMonth(currentYear, currentMonth);
     const firstWeekday = getMondayBasedWeekday(currentYear, currentMonth, 1);
@@ -343,62 +251,29 @@ export const HomeAndNotificationsScreenView: React.FC<
     "0"
   )} de ${MONTHS_PT[currentMonth]}`;
 
+  // Dieta em destaque para o dia
+  const featuredDiet = DIET_CATALOG[0];
+  const isDietFavorited = account.favoriteDietIds.includes(featuredDiet.id);
+  const isPremiumUser = account.subscription.plan !== "none";
+
+  const handleOpenNotifications = () => {
+    if (account.notifications.length === 0) {
+      setSubScreen("24_notification_empty");
+    } else {
+      setSubScreen("25_notification_list");
+    }
+  };
+
   return (
     <View style={styles.screenContainer}>
       <StatusBarMock variant="white" />
 
-      {/* Seletor rápido de sub-telas do Módulo 5 (Home & Notificações + atalho Premium) */}
-      <View style={styles.subNavWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.subNavScroll}
-        >
-          {(
-            [
-              { key: "23_home", label: "23. Home" },
-              { key: "24_notification_empty", label: "24. Notif. Vazio" },
-              { key: "25_notification_list", label: "25. Notificações" },
-            ] as const
-          ).map((item) => {
-            const active = subScreen === item.key;
-            return (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => setSubScreen(item.key)}
-                style={[styles.subPill, active && styles.subPillActive]}
-              >
-                <AppText
-                  variant="footnote"
-                  color={
-                    active ? colors.grayscale[600] : colors.grayscale[200]
-                  }
-                >
-                  {item.label}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-
-          <TouchableOpacity
-            onPress={onOpenPremium}
-            style={[
-              styles.subPill,
-              {
-                borderColor: colors.primary[100],
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-              },
-            ]}
-          >
-            <Sparkles size={12} color={colors.primary[100]} />
-            <AppText variant="footnote" color={colors.primary[100]}>
-              16-22. Fluxo Premium
-            </AppText>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+      {/* Pílulas de sub-telas (visíveis apenas no Modo Demo) */}
+      <DemoStepPills
+        steps={SUB_SCREEN_PILLS}
+        active={subScreen}
+        onChange={(k: HomeSubScreen) => setSubScreen(k)}
+      />
 
       {/* TELA 23 — HOME (62993:4376) */}
       {subScreen === "23_home" && (
@@ -411,15 +286,27 @@ export const HomeAndNotificationsScreenView: React.FC<
             <View style={styles.homeHeaderRow}>
               <View style={styles.userGreetingRow}>
                 <Image
-                  source={{
-                    uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-                  }}
+                  source={{ uri: account.profile.avatarUri }}
                   style={styles.userAvatar}
                 />
                 <View>
-                  <AppText variant="footnote" color={colors.grayscale[200]}>
-                    Olá, Mariana
-                  </AppText>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <AppText variant="footnote" color={colors.grayscale[200]}>
+                      Olá, {account.profile.name.split(" ")[0]}
+                    </AppText>
+                    {isPremiumUser ? (
+                      <View style={styles.premiumBadge}>
+                        <Sparkles size={10} color={colors.grayscale[600]} />
+                        <AppText
+                          variant="caption2"
+                          color={colors.grayscale[600]}
+                          style={{ fontSize: 10, fontWeight: "700" }}
+                        >
+                          PRO
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
                   <AppText variant="headline" color={colors.grayscale[100]}>
                     Bom Dia
                   </AppText>
@@ -430,29 +317,42 @@ export const HomeAndNotificationsScreenView: React.FC<
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={onOpenPremium}
-                  style={styles.headerIconBtn}
+                  style={[
+                    styles.headerIconBtn,
+                    isPremiumUser && {
+                      borderColor: colors.accent[200],
+                      backgroundColor: "rgba(245, 243, 120, 0.15)",
+                    },
+                  ]}
                 >
                   <ActionIcon
                     name="premium"
                     size={20}
-                    color={colors.accent[200]}
+                    color={
+                      isPremiumUser ? colors.accent[200] : colors.grayscale[200]
+                    }
                   />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setSubScreen("25_notification_list")}
+                  onPress={handleOpenNotifications}
                   style={styles.headerIconBtn}
                 >
                   <ActionIcon
                     name="notification"
                     size={20}
-                    color={colors.grayscale[100]}
+                    color={
+                      account.notifications.length > 0
+                        ? colors.primary[100]
+                        : colors.grayscale[100]
+                    }
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Bloco do Calendário Funcional (Barra de controle + Strip Semanal + Mês Expansível) */}
+            {/* Bloco do Calendário Funcional */}
             <View style={{ gap: 10 }}>
               <View style={styles.calendarToolbar}>
                 <View style={styles.calendarNavLeft}>
@@ -487,11 +387,30 @@ export const HomeAndNotificationsScreenView: React.FC<
                 <View style={{ flexDirection: "row", gap: 6 }}>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => handleSelectFullDate(2026, 9, 11)}
-                    style={styles.todayChip}
+                    onPress={() =>
+                      handleSelectFullDate(
+                        initialDate.year,
+                        initialDate.month,
+                        initialDate.day
+                      )
+                    }
+                    style={[
+                      styles.todayChip,
+                      isTodaySelected && {
+                        borderColor: colors.primary[100],
+                        backgroundColor: "rgba(255, 111, 67, 0.15)",
+                      },
+                    ]}
                   >
-                    <AppText variant="caption2" color={colors.grayscale[100]}>
-                      Hoje (11/10)
+                    <AppText
+                      variant="caption2"
+                      color={
+                        isTodaySelected
+                          ? colors.primary[100]
+                          : colors.grayscale[100]
+                      }
+                    >
+                      Hoje
                     </AppText>
                   </TouchableOpacity>
 
@@ -507,13 +426,13 @@ export const HomeAndNotificationsScreenView: React.FC<
                     ]}
                   >
                     <AppText variant="caption2" color={colors.grayscale[100]}>
-                      {showMonthCalendar ? "Fechar Mês" : "Mês"}
+                      {showMonthCalendar ? "Fechar" : "Mês"}
                     </AppText>
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Calendário Semanal Branco (388x110 - Figma Node 62993:4376) */}
+              {/* Calendário Semanal Branco */}
               <View style={styles.weekCalendarCard}>
                 {weekDaysStrip.map((item) => {
                   const isSelected =
@@ -521,13 +440,8 @@ export const HomeAndNotificationsScreenView: React.FC<
                     item.month === currentMonth &&
                     item.day === selectedDay;
 
-                  const dayMetrics = getBaseNutritionForDate(
-                    item.year,
-                    item.month,
-                    item.day
-                  );
-                  const hasHighProgress =
-                    dayMetrics.caloriesConsumed / dayMetrics.caloriesGoal > 0.55;
+                  const dayTotals = totalsForDay(account.meals, item.dateKey);
+                  const hasMeals = dayTotals.calories > 0;
 
                   return (
                     <TouchableOpacity
@@ -574,14 +488,14 @@ export const HomeAndNotificationsScreenView: React.FC<
                         </AppText>
                       </View>
 
-                      {/* Indicador de atividade nutricional na data */}
+                      {/* Indicador de registro de refeição na data */}
                       <View
                         style={[
                           styles.dayDot,
                           {
                             backgroundColor: isSelected
                               ? colors.primary[100]
-                              : hasHighProgress
+                              : hasMeals
                               ? colors.accent[300]
                               : colors.grayscale[300],
                           },
@@ -688,7 +602,7 @@ export const HomeAndNotificationsScreenView: React.FC<
                   maxValue={activeNutrition.carbsGoal}
                   maxLabel={`${activeNutrition.carbsGoal}g`}
                   progress={activeNutrition.carbsProgress}
-                  backgroundColor={colors.accent[200]} // #F5F378
+                  backgroundColor={colors.accent[200]}
                 />
                 <MacroProgressCard
                   type="protein"
@@ -697,64 +611,109 @@ export const HomeAndNotificationsScreenView: React.FC<
                   maxValue={activeNutrition.proteinGoal}
                   maxLabel={`${activeNutrition.proteinGoal}g`}
                   progress={activeNutrition.proteinProgress}
-                  backgroundColor={colors.accent[300]} // #45C588
+                  backgroundColor={colors.accent[300]}
                 />
               </View>
 
-              {/* Ações rápidas interativas para testar os contadores animados no dia selecionado */}
+              {/* Botões de Ação Rápida */}
               <View style={styles.quickInteractiveRow}>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => handleLogQuickMeal(180, 22, 14)}
+                  onPress={() => handleLogQuickMeal("snack", 180, 22, 14, 4)}
                   style={styles.quickActionPill}
                 >
                   <Plus size={14} color={colors.accent[200]} />
                   <AppText variant="caption2" color={colors.grayscale[100]}>
-                    Lanche (+180 kcal)
+                    + Lanche (180 kcal)
                   </AppText>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => handleLogQuickMeal(380, 38, 28)}
+                  onPress={() => handleLogQuickMeal("meal", 380, 38, 28, 10)}
                   style={styles.quickActionPill}
                 >
                   <Plus size={14} color={colors.accent[300]} />
                   <AppText variant="caption2" color={colors.grayscale[100]}>
-                    Refeição (+380 kcal)
+                    + Refeição (380 kcal)
                   </AppText>
                 </TouchableOpacity>
 
-                {customDeltas[dateKey] ? (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={handleResetDay}
-                    style={styles.quickResetPill}
-                  >
-                    <RotateCcw size={13} color={colors.primary[100]} />
-                    <AppText variant="caption2" color={colors.primary[100]}>
-                      Resetar
-                    </AppText>
-                  </TouchableOpacity>
-                ) : null}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => onNavigateTab?.("scan")}
+                  style={[
+                    styles.quickActionPill,
+                    { borderColor: colors.primary[100] },
+                  ]}
+                >
+                  <Sparkles size={14} color={colors.primary[100]} />
+                  <AppText variant="caption2" color={colors.primary[100]}>
+                    Scan IA
+                  </AppText>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Seção: Plano Alimentar do Dia */}
+            {/* Seção: Refeições Registradas Hoje */}
+            <View style={{ gap: 12 }}>
+              <View style={styles.sectionTitleRow}>
+                <AppText variant="title2" color={colors.grayscale[100]}>
+                  Refeições de {formattedSelectedDate}
+                </AppText>
+                <AppText variant="footnote" color={colors.grayscale[200]}>
+                  {dayMeals.length} registrada{dayMeals.length === 1 ? "" : "s"}
+                </AppText>
+              </View>
+
+              {dayMeals.length === 0 ? (
+                <View style={styles.emptyMealsCard}>
+                  <AppText variant="body2" color={colors.grayscale[200]}>
+                    Nenhuma refeição registrada nesta data. Use os botões acima ou
+                    o Scan IA para registrar!
+                  </AppText>
+                </View>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  {dayMeals.map((meal) => (
+                    <View key={meal.id} style={styles.mealItemCard}>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <AppText variant="headline" color={colors.grayscale[100]}>
+                          {meal.name}
+                        </AppText>
+                        <AppText variant="footnote" color={colors.grayscale[200]}>
+                          {meal.calories} kcal • P: {meal.protein}g • C:{" "}
+                          {meal.carbs}g • G: {meal.fat}g
+                        </AppText>
+                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => removeMeal(meal.id)}
+                        style={styles.deleteMealBtn}
+                      >
+                        <Trash2 size={16} color={colors.message[200]} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Seção: Plano Alimentar em Destaque */}
             <View style={{ gap: 14 }}>
               <AppText variant="title2" color={colors.grayscale[100]}>
-                Plano Alimentar ({formattedSelectedDate})
+                Plano Recomendado
               </AppText>
 
               <DietCard
-                title={activeNutrition.planTitle}
-                calories={activeNutrition.planCalories}
-                protein={activeNutrition.planProtein}
-                carbs={activeNutrition.planCarbs}
-                fat={activeNutrition.planFat}
-                imageUri={activeNutrition.planImage}
-                favorited={dietFav}
-                onFavoriteToggle={() => setDietFav((v) => !v)}
+                title={featuredDiet.title}
+                calories={featuredDiet.calories}
+                protein={featuredDiet.protein}
+                carbs={featuredDiet.carbs}
+                fat={featuredDiet.fat}
+                imageUri={featuredDiet.imageUri}
+                favorited={isDietFavorited}
+                onFavoriteToggle={() => toggleFavoriteDiet(featuredDiet.id)}
                 onPress={() => onNavigateTab?.("diet")}
               />
             </View>
@@ -769,7 +728,7 @@ export const HomeAndNotificationsScreenView: React.FC<
         </View>
       )}
 
-      {/* TELA 24 — NOTIFICAÇÕES VAZIO (62998:2366) */}
+      {/* TELA 24 — NOTIFICAÇÕES VAZIO */}
       {subScreen === "24_notification_empty" && (
         <View style={styles.notifScreenWrapper}>
           <View style={{ paddingHorizontal: 20 }}>
@@ -796,7 +755,7 @@ export const HomeAndNotificationsScreenView: React.FC<
               variant="body2"
               color={colors.grayscale[200]}
               align="center"
-              style={{ maxWidth: 240 }}
+              style={{ maxWidth: 260 }}
             >
               Seus hábitos saudáveis estão em dia — continue assim!
             </AppText>
@@ -806,7 +765,7 @@ export const HomeAndNotificationsScreenView: React.FC<
         </View>
       )}
 
-      {/* TELA 25 — LISTA DE NOTIFICAÇÕES (62998:2748) */}
+      {/* TELA 25 — LISTA DE NOTIFICAÇÕES */}
       {subScreen === "25_notification_list" && (
         <View style={styles.notifScreenWrapper}>
           <View style={{ paddingHorizontal: 20 }}>
@@ -814,16 +773,37 @@ export const HomeAndNotificationsScreenView: React.FC<
               title="Notificações"
               onBackPress={() => setSubScreen("23_home")}
               rightAction="close"
-              onRightPress={() => setSubScreen("24_notification_empty")}
+              onRightPress={() => setSubScreen("23_home")}
             />
+          </View>
+
+          <View style={styles.notifActionsHeader}>
+            <AppText variant="footnote" color={colors.grayscale[200]}>
+              {account.notifications.length} notificações
+            </AppText>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                clearNotifications();
+                setSubScreen("24_notification_empty");
+              }}
+            >
+              <AppText variant="footnote" color={colors.primary[100]}>
+                Limpar todas
+              </AppText>
+            </TouchableOpacity>
           </View>
 
           <ScrollView
             contentContainerStyle={styles.notifListScroll}
             showsVerticalScrollIndicator={false}
           >
-            {NOTIFICATIONS_PT.map((msg, i) => (
-              <NotificationCard key={i} message={msg} />
+            {account.notifications.map((n) => (
+              <NotificationCard
+                key={n.id}
+                message={n.message}
+                time={n.time}
+              />
             ))}
           </ScrollView>
 
@@ -838,29 +818,7 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
-  },
-  subNavWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
-  subNavScroll: {
-    gap: 6,
-    paddingVertical: 4,
-  },
-  subPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-  },
-  subPillActive: {
-    backgroundColor: colors.accent[200],
-    borderColor: colors.accent[200],
   },
   homeScroll: {
     paddingHorizontal: 20,
@@ -882,6 +840,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+  },
+  premiumBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: colors.accent[200],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.full,
   },
   headerActionsRow: {
     flexDirection: "row",
@@ -952,7 +919,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dayColumnSelected: {
-    backgroundColor: colors.accent[100], // #DDC0FF
+    backgroundColor: colors.accent[100],
   },
   dateCircle: {
     width: 28,
@@ -1027,16 +994,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.grayscale[400],
   },
-  quickResetPill: {
+  emptyMealsCard: {
+    backgroundColor: colors.grayscale[500],
+    borderRadius: radii.lg,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.grayscale[400],
+  },
+  mealItemCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: radii.full,
+    justifyContent: "space-between",
     backgroundColor: colors.grayscale[500],
+    borderRadius: radii.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: colors.primary[100],
+    borderColor: colors.grayscale[400],
+  },
+  deleteMealBtn: {
+    padding: 8,
   },
   floatingMenuWrapper: {
     position: "absolute",
@@ -1048,6 +1025,13 @@ const styles = StyleSheet.create({
   notifScreenWrapper: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  notifActionsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   emptyCenter: {
     flex: 1,

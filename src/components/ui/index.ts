@@ -7,4 +7,5 @@ export * from "./SelectionControls";
 export * from "./Navigation";
 export * from "./Elements";
 export * from "./PortfolioNavBar";
+export * from "./DeviceChrome";
 

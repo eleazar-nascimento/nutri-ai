@@ -5,15 +5,25 @@ import { colors, radii } from "@/theme";
 import { AppText } from "./Typography";
 import { CircleIconButton } from "./Button";
 import { BottomMenuIcon, BottomMenuTab } from "./Icons";
+import { useDeviceChrome } from "./DeviceChrome";
 
 /**
  * Status Bar do Style Guide (Figma Node 885:5068)
  * Variantes: white (texto branco para fundo dark) e black (texto preto para fundo claro)
+ * Mobile-first: só é exibida dentro da moldura de celular na Web (em aparelhos
+ * reais o sistema operacional já desenha a barra de status). Use `force` no Style Guide.
  */
 export const StatusBarMock: React.FC<{
   variant?: "white" | "black";
   time?: string;
-}> = ({ variant = "white", time = "9:41" }) => {
+  force?: boolean;
+}> = ({ variant = "white", time, force = false }) => {
+  const framed = useDeviceChrome();
+  if (!framed && !force) return null;
+
+  const now = new Date();
+  const displayTime =
+    time ?? `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
   const iconColor =
     variant === "white" ? colors.grayscale[100] : colors.grayscale[800];
 
@@ -29,7 +39,7 @@ export const StatusBarMock: React.FC<{
       }}
     >
       <AppText variant="callout" color={iconColor}>
-        {time}
+        {displayTime}
       </AppText>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
         <Signal size={15} color={iconColor} />
@@ -42,10 +52,15 @@ export const StatusBarMock: React.FC<{
 
 /**
  * Home Indicator iOS (Figma Node 885:5091)
+ * Exibido apenas na moldura de celular da Web (ou com `force`).
  */
 export const HomeIndicator: React.FC<{
   variant?: "light" | "dark";
-}> = ({ variant = "light" }) => {
+  force?: boolean;
+}> = ({ variant = "light", force = false }) => {
+  const framed = useDeviceChrome();
+  if (!framed && !force) return null;
+
   return (
     <View
       style={{

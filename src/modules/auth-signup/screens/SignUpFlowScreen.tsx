@@ -13,8 +13,16 @@ import {
   FormInput,
   Button,
   CircleIconButton,
+  Checkbox,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
 import { NumericKeypad } from "@/modules/auth-login";
+import {
+  useAppStore,
+  TEST_USER,
+  EMAIL_REGEX,
+  validatePassword,
+} from "@/store";
 
 export type SignUpScreenStep =
   | "13_signup_default"
@@ -34,28 +42,34 @@ export interface SignUpFlowScreenProps {
 
 /**
  * Módulo 4 — Sign Up (Telas 13 a 15 do Figma)
- * - 13_Sign Up-Default (62993:3844)
- * - 14_Sign Up-Fill (62993:3967)
- * - 15_Verification (62993:4275)
  */
 export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
   onNavigateToLogin,
   onSignUpSuccess,
 }) => {
-  const [step, setStep] = useState<SignUpScreenStep>("13_signup_default");
-  const [fullName, setFullName] = useState("Mariana Costa");
-  const [email, setEmail] = useState("marianacosta@email.com");
-  const [password, setPassword] = useState("NutriAI@2026");
+  const { demoMode, signUp } = useAppStore();
+  const [step, setStep] = useState<SignUpScreenStep>("14_signup_fill");
+  const [fullName, setFullName] = useState("Lucas Mendes");
+  const [email, setEmail] = useState("lucas@nutriai.com");
+  const [password, setPassword] = useState("Nutri@123");
+  const [acceptTerms, setAcceptTerms] = useState(true);
+
+  const [nameError, setNameError] = useState<string | undefined>();
+  const [emailError, setEmailError] = useState<string | undefined>();
+  const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [otpError, setOtpError] = useState<string | undefined>();
+
   const [otpDigits, setOtpDigits] = useState<string[]>([
-    "8",
-    "5",
-    "6",
+    "1",
+    "2",
     "3",
     "4",
+    "5",
     "6",
   ]);
 
   const handleKeypadDigit = (digit: string) => {
+    setOtpError(undefined);
     const emptyIdx = otpDigits.findIndex((d) => d === "");
     if (emptyIdx !== -1) {
       const next = [...otpDigits];
@@ -68,6 +82,7 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
   };
 
   const handleKeypadBackspace = () => {
+    setOtpError(undefined);
     const lastFilled = [...otpDigits]
       .reverse()
       .findIndex((d) => d.length > 0);
@@ -79,47 +94,66 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
     }
   };
 
-  const isFilled = step === "14_signup_fill";
+  const handleContinueSignUp = () => {
+    setNameError(undefined);
+    setEmailError(undefined);
+    setPasswordError(undefined);
+
+    if (fullName.trim().length < 2) {
+      setNameError("Informe seu nome completo (mínimo 2 caracteres).");
+      return;
+    }
+    if (!EMAIL_REGEX.test(email.trim().toLowerCase())) {
+      setEmailError("Informe um endereço de e-mail válido.");
+      return;
+    }
+    const pwdErr = validatePassword(password);
+    if (pwdErr) {
+      setPasswordError(pwdErr);
+      return;
+    }
+    if (!acceptTerms) {
+      setPasswordError("Aceite os termos de uso para continuar.");
+      return;
+    }
+
+    setOtpDigits(["1", "2", "3", "4", "5", "6"]);
+    setOtpError(undefined);
+    setStep("15_verification");
+  };
+
+  const handleVerifyAndCreate = () => {
+    const code = otpDigits.join("");
+    if (code.length < 6) {
+      setOtpError("Digite os 6 dígitos do código.");
+      return;
+    }
+    const res = signUp(fullName, email, password);
+    if (!res.ok) {
+      setOtpError(res.error);
+      return;
+    }
+    onSignUpSuccess?.();
+  };
+
+  const showEmpty = demoMode && step === "13_signup_default";
 
   return (
     <View style={styles.screenContainer}>
       <StatusBarMock variant="white" />
 
-      {/* Seletor rápido das 3 telas do Passo 4 do Figma */}
-      <View style={styles.subNavWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.subNavScroll}
-        >
-          {SIGNUP_PILLS.map((p) => {
-            const active = step === p.key;
-            return (
-              <TouchableOpacity
-                key={p.key}
-                activeOpacity={0.8}
-                onPress={() => setStep(p.key)}
-                style={[styles.subPill, active && styles.subPillActive]}
-              >
-                <AppText
-                  variant="footnote"
-                  color={
-                    active ? colors.grayscale[600] : colors.grayscale[200]
-                  }
-                >
-                  {p.label}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <DemoStepPills
+        steps={SIGNUP_PILLS}
+        active={step}
+        onChange={(k: SignUpScreenStep) => setStep(k)}
+      />
 
       {/* TELAS 13 e 14 — FORMULÁRIO DE CADASTRO */}
       {(step === "13_signup_default" || step === "14_signup_fill") && (
         <ScrollView
           contentContainerStyle={styles.contentScroll}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={{ alignSelf: "flex-start" }}>
             <CircleIconButton type="back" onPress={onNavigateToLogin} />
@@ -146,23 +180,27 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
             <FormInput
               label="Nome Completo"
               placeholder="Digite seu nome completo"
-              value={isFilled ? fullName : ""}
+              value={showEmpty ? "" : fullName}
               onChangeText={(txt) => {
                 setFullName(txt);
+                setNameError(undefined);
                 setStep("14_signup_fill");
               }}
-              state={isFilled ? "field" : "default"}
+              state={nameError ? "error" : showEmpty ? "default" : "field"}
+              errorMessage={nameError}
             />
 
             <FormInput
               label="E-mail"
               placeholder="Digite seu e-mail"
-              value={isFilled ? email : ""}
+              value={showEmpty ? "" : email}
               onChangeText={(txt) => {
                 setEmail(txt);
+                setEmailError(undefined);
                 setStep("14_signup_fill");
               }}
-              state={isFilled ? "field" : "default"}
+              state={emailError ? "error" : showEmpty ? "default" : "field"}
+              errorMessage={emailError}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -170,13 +208,21 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
             <FormInput
               label="Senha"
               placeholder="Digite sua senha"
-              value={isFilled ? password : ""}
+              value={showEmpty ? "" : password}
               onChangeText={(txt) => {
                 setPassword(txt);
+                setPasswordError(undefined);
                 setStep("14_signup_fill");
               }}
               isPassword
-              state={isFilled ? "field" : "default"}
+              state={passwordError ? "error" : showEmpty ? "default" : "field"}
+              errorMessage={passwordError}
+            />
+
+            <Checkbox
+              checked={acceptTerms}
+              onChange={setAcceptTerms}
+              label="Concordo com os Termos de Uso e Política de Privacidade"
             />
           </View>
 
@@ -185,13 +231,7 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
               title="Cadastrar"
               variant="primary"
               size="large"
-              onPress={() => {
-                if (step === "13_signup_default") {
-                  setStep("14_signup_fill");
-                } else {
-                  setStep("15_verification");
-                }
-              }}
+              onPress={handleContinueSignUp}
             />
 
             <TouchableOpacity
@@ -235,7 +275,7 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
                 align="center"
               >
                 {"Digite o código que enviamos por mensagem para\n"}
-                {email}
+                {email} (código: {TEST_USER.otp})
               </AppText>
             </View>
 
@@ -248,6 +288,9 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
                     digit.length > 0 && {
                       borderColor: colors.grayscale[100],
                     },
+                    otpError && {
+                      borderColor: colors.message[200],
+                    },
                   ]}
                 >
                   <AppText variant="headline" color={colors.grayscale[100]}>
@@ -257,13 +300,26 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
               ))}
             </View>
 
+            {otpError ? (
+              <AppText
+                variant="footnote"
+                color={colors.message[200]}
+                align="center"
+              >
+                {otpError}
+              </AppText>
+            ) : null}
+
             <View style={styles.resendBlock}>
               <AppText variant="body2" color={colors.grayscale[100]}>
                 Não recebeu o código?
               </AppText>
               <TouchableOpacity
                 activeOpacity={0.75}
-                onPress={() => setOtpDigits(["8", "5", "6", "3", "4", "6"])}
+                onPress={() => {
+                  setOtpDigits(["1", "2", "3", "4", "5", "6"]);
+                  setOtpError(undefined);
+                }}
               >
                 <AppText variant="headline" color={colors.primary[100]}>
                   Reenviar código
@@ -272,10 +328,10 @@ export const SignUpFlowScreenView: React.FC<SignUpFlowScreenProps> = ({
             </View>
 
             <Button
-              title="Verificar"
+              title="Verificar e Criar Conta"
               variant="primary"
               size="large"
-              onPress={onSignUpSuccess}
+              onPress={handleVerifyAndCreate}
             />
           </View>
 
@@ -295,36 +351,14 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
     justifyContent: "space-between",
-  },
-  subNavWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  subNavScroll: {
-    gap: 6,
-    paddingVertical: 4,
-  },
-  subPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-  },
-  subPillActive: {
-    backgroundColor: colors.accent[200],
-    borderColor: colors.accent[200],
   },
   contentScroll: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 32,
-    gap: 26,
+    gap: 24,
   },
   welcomeBlock: {
     alignItems: "center",
@@ -337,7 +371,7 @@ const styles = StyleSheet.create({
   bottomButtonSection: {
     width: "100%",
     gap: 18,
-    marginTop: 28,
+    marginTop: 18,
   },
   switchAuthRow: {
     flexDirection: "row",
@@ -351,7 +385,7 @@ const styles = StyleSheet.create({
   verificationTopContent: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    gap: 24,
+    gap: 20,
     alignItems: "center",
   },
   otpSixRow: {
@@ -361,7 +395,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   otpBox51: {
-    width: 51,
+    flex: 1,
+    maxWidth: 51,
     height: 51,
     borderRadius: radii.md,
     backgroundColor: colors.grayscale[600],
@@ -375,4 +410,3 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 });
-

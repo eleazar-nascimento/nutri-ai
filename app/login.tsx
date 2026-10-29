@@ -1,28 +1,17 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "@/theme";
-import { PortfolioNavBar } from "@/components/ui";
+import { Screen } from "@/components/layout";
 import { LoginFlowScreenView } from "@/modules/auth-login";
 
 export default function LoginRoute() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.root}>
-      <PortfolioNavBar />
+    <Screen keyboardAvoiding>
       <LoginFlowScreenView
         onNavigateToSignUp={() => router.push("/signup" as any)}
-        onLoginSuccess={() => router.push("/home" as any)}
+        onLoginSuccess={() => router.replace("/home" as any)}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-});
-

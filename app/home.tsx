@@ -1,8 +1,7 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "@/theme";
-import { PortfolioNavBar, BottomMenuTab } from "@/components/ui";
+import { BottomMenuTab } from "@/components/ui";
+import { Screen } from "@/components/layout";
 import { HomeAndNotificationsScreenView } from "@/modules/home-premium";
 
 export default function HomeRoute() {
@@ -17,20 +16,11 @@ export default function HomeRoute() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <PortfolioNavBar />
+    <Screen>
       <HomeAndNotificationsScreenView
         onOpenPremium={() => router.push("/premium" as any)}
         onNavigateTab={handleTabPress}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-});
-

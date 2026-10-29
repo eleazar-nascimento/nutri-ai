@@ -16,6 +16,13 @@ import {
   CircleIconButton,
   MessageModalCard,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
+import {
+  useAppStore,
+  TEST_USER,
+  EMAIL_REGEX,
+  validatePassword,
+} from "@/store";
 import { NumericKeypad } from "../components/NumericKeypad";
 
 export type LoginScreenStep =
@@ -46,34 +53,43 @@ export interface LoginFlowScreenProps {
 
 /**
  * Módulo 3 — Log In & Forgot Password (Telas 05 a 12 do Figma)
- * - 05_Log in-Default (62991:784)
- * - 06_Log in-Error (62993:1462)
- * - 07_Log in-Active (62993:1594)
- * - 08_Log in-Fill (62993:1744)
- * - 09_Verification (62993:2224)
- * - 10_Forgot Password (62993:2959)
- * - 11_Reset Password (62993:3555)
- * - 12_Reset Password Modal (62993:3629)
  */
 export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
   onNavigateToSignUp,
   onLoginSuccess,
 }) => {
-  const [step, setStep] = useState<LoginScreenStep>("05_login_default");
-  const [email, setEmail] = useState("marianacosta@email.com");
-  const [password, setPassword] = useState("NutriAI2026");
-  const [newPassword, setNewPassword] = useState("NovaSenha@2026");
-  const [confirmPassword, setConfirmPassword] = useState("NovaSenha@2026");
+  const {
+    demoMode,
+    accounts,
+    login,
+    loginAsTestUser,
+    resetPassword,
+  } = useAppStore();
+
+  const [step, setStep] = useState<LoginScreenStep>("08_login_fill");
+  const [email, setEmail] = useState<string>(TEST_USER.email);
+  const [password, setPassword] = useState<string>(TEST_USER.password);
+  const [emailError, setEmailError] = useState<string | undefined>();
+  const [passwordError, setPasswordError] = useState<string | undefined>();
+  const [otpError, setOtpError] = useState<string | undefined>();
+
+  const [forgotEmail, setForgotEmail] = useState<string>(TEST_USER.email);
+  const [forgotError, setForgotError] = useState<string | undefined>();
+  const [newPassword, setNewPassword] = useState<string>("Nutri@2026");
+  const [confirmPassword, setConfirmPassword] = useState<string>("Nutri@2026");
+  const [resetError, setResetError] = useState<string | undefined>();
+
   const [otpDigits, setOtpDigits] = useState<string[]>([
-    "8",
-    "5",
-    "6",
+    "1",
+    "2",
     "3",
     "4",
+    "5",
     "6",
   ]);
 
   const handleKeypadDigit = (digit: string) => {
+    setOtpError(undefined);
     const emptyIdx = otpDigits.findIndex((d) => d === "");
     if (emptyIdx !== -1) {
       const next = [...otpDigits];
@@ -86,6 +102,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
   };
 
   const handleKeypadBackspace = () => {
+    setOtpError(undefined);
     const lastFilled = [...otpDigits]
       .reverse()
       .findIndex((d) => d.length > 0);
@@ -103,64 +120,148 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
     step === "07_login_active" ||
     step === "08_login_fill";
 
-  const getEmailValue = () => {
-    if (step === "05_login_default") return "";
-    if (step === "06_login_error") return "";
-    if (step === "07_login_active") return "marianacos|";
+  const handleFillTestUser = () => {
+    setEmail(TEST_USER.email);
+    setPassword(TEST_USER.password);
+    setEmailError(undefined);
+    setPasswordError(undefined);
+    setStep("08_login_fill");
+  };
+
+  const handleSubmitLogin = () => {
+    setEmailError(undefined);
+    setPasswordError(undefined);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setEmailError("Por favor, informe seu e-mail.");
+      setStep("06_login_error");
+      return;
+    }
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setEmailError("Formato de e-mail inválido.");
+      setStep("06_login_error");
+      return;
+    }
+    if (!password) {
+      setPasswordError("Por favor, informe sua senha.");
+      setStep("06_login_error");
+      return;
+    }
+
+    const account = accounts[normalizedEmail];
+    if (!account) {
+      setEmailError(
+        `Conta não encontrada. Use ${TEST_USER.email} ou cadastre-se.`
+      );
+      setStep("06_login_error");
+      return;
+    }
+    if (account.password !== password) {
+      setPasswordError(
+        `Senha incorreta para esta conta (teste: ${TEST_USER.password}).`
+      );
+      setStep("06_login_error");
+      return;
+    }
+
+    setOtpDigits(["1", "2", "3", "4", "5", "6"]);
+    setOtpError(undefined);
+    setStep("09_verification");
+  };
+
+  const handleVerifyOtp = () => {
+    const code = otpDigits.join("");
+    if (code.length < 6) {
+      setOtpError("Digite os 6 dígitos do código de verificação.");
+      return;
+    }
+    if (code !== TEST_USER.otp && !demoMode) {
+      setOtpError(`Código inválido. Para o usuário de teste use ${TEST_USER.otp}.`);
+      return;
+    }
+    const res = login(email, password);
+    if (!res.ok) {
+      setOtpError(res.error);
+      return;
+    }
+    onLoginSuccess?.();
+  };
+
+  const handleSocialLogin = () => {
+    loginAsTestUser();
+    onLoginSuccess?.();
+  };
+
+  const handleSendRecoveryLink = () => {
+    setForgotError(undefined);
+    const normalized = forgotEmail.trim().toLowerCase();
+    if (!EMAIL_REGEX.test(normalized)) {
+      setForgotError("Informe um e-mail válido para recuperação.");
+      return;
+    }
+    if (!accounts[normalized]) {
+      setForgotError(
+        `E-mail não encontrado. Experimente ${TEST_USER.email}.`
+      );
+      return;
+    }
+    setStep("11_reset_password");
+  };
+
+  const handleConfirmResetPassword = () => {
+    setResetError(undefined);
+    const pwdErr = validatePassword(newPassword);
+    if (pwdErr) {
+      setResetError(pwdErr);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetError("As senhas digitadas não coincidem.");
+      return;
+    }
+    const res = resetPassword(forgotEmail, newPassword);
+    if (!res.ok) {
+      setResetError(res.error);
+      return;
+    }
+    setEmail(forgotEmail.trim().toLowerCase());
+    setPassword(newPassword);
+    setStep("12_reset_modal");
+  };
+
+  const getEmailDisplay = () => {
+    if (demoMode && step === "05_login_default") return "";
+    if (demoMode && step === "07_login_active") return "marianacos|";
     return email;
   };
 
-  const getPasswordValue = () => {
-    if (step === "05_login_default" || step === "06_login_error") return "";
+  const getPasswordDisplay = () => {
+    if (demoMode && step === "05_login_default") return "";
     return password;
-  };
-
-  const getInputState = () => {
-    if (step === "06_login_error") return "error" as const;
-    if (step === "07_login_active") return "active" as const;
-    if (step === "08_login_fill") return "field" as const;
-    return "default" as const;
   };
 
   return (
     <View style={styles.screenContainer}>
       <StatusBarMock variant="white" />
 
-      {/* Seletor rápido das 8 telas do Passo 3 do Figma */}
-      <View style={styles.subNavWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.subNavScroll}
-        >
-          {STEP_PILLS.map((p) => {
-            const active = step === p.key;
-            return (
-              <TouchableOpacity
-                key={p.key}
-                activeOpacity={0.8}
-                onPress={() => setStep(p.key)}
-                style={[styles.subPill, active && styles.subPillActive]}
-              >
-                <AppText
-                  variant="footnote"
-                  color={
-                    active ? colors.grayscale[600] : colors.grayscale[200]
-                  }
-                >
-                  {p.label}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Seletor rápido das 8 telas do Passo 3 (visível apenas no Modo Demo) */}
+      <DemoStepPills
+        steps={STEP_PILLS}
+        active={step}
+        onChange={(key: LoginScreenStep) => {
+          setEmailError(undefined);
+          setPasswordError(undefined);
+          setStep(key);
+        }}
+      />
 
       {/* TELAS 05, 06, 07 e 08 — LOGIN */}
       {isLoginScreen && (
         <ScrollView
           contentContainerStyle={styles.contentScroll}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.welcomeBlock}>
             <AppText
@@ -179,17 +280,62 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
             </AppText>
           </View>
 
+          {/* Card de Acesso Rápido do Usuário de Teste */}
+          <View style={styles.testHelperBanner}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText variant="caption2" color={colors.accent[300]}>
+                Credenciais de Teste • Mobile-First
+              </AppText>
+              <AppText variant="footnote" color={colors.grayscale[200]}>
+                {TEST_USER.email} • Senha: {TEST_USER.password} • OTP:{" "}
+                {TEST_USER.otp}
+              </AppText>
+            </View>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleFillTestUser}
+                style={styles.testBannerBtnSecondary}
+              >
+                <AppText variant="footnote" color={colors.grayscale[100]}>
+                  Preencher
+                </AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  loginAsTestUser();
+                  onLoginSuccess?.();
+                }}
+                style={styles.testBannerBtnPrimary}
+              >
+                <AppText variant="footnote" color={colors.grayscale[100]}>
+                  1-Click
+                </AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <View style={styles.formContainer}>
             <FormInput
               label="E-mail"
               placeholder="Digite seu e-mail"
-              value={getEmailValue()}
+              value={getEmailDisplay()}
               onChangeText={(txt) => {
                 setEmail(txt);
+                setEmailError(undefined);
                 setStep("08_login_fill");
               }}
-              state={getInputState()}
-              errorMessage="Por favor, informe seu e-mail"
+              state={
+                emailError || (demoMode && step === "06_login_error")
+                  ? "error"
+                  : demoMode && step === "07_login_active"
+                  ? "active"
+                  : email
+                  ? "field"
+                  : "default"
+              }
+              errorMessage={emailError ?? "Por favor, informe seu e-mail"}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -198,18 +344,29 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
               <FormInput
                 label="Senha"
                 placeholder="Digite sua senha"
-                value={getPasswordValue()}
+                value={getPasswordDisplay()}
                 onChangeText={(txt) => {
                   setPassword(txt);
+                  setPasswordError(undefined);
                   setStep("08_login_fill");
                 }}
                 isPassword
-                state={getInputState()}
-                errorMessage="Por favor, informe sua senha"
+                state={
+                  passwordError || (demoMode && step === "06_login_error")
+                    ? "error"
+                    : password
+                    ? "field"
+                    : "default"
+                }
+                errorMessage={passwordError ?? "Por favor, informe sua senha"}
               />
               <TouchableOpacity
                 activeOpacity={0.75}
-                onPress={() => setStep("10_forgot_password")}
+                onPress={() => {
+                  setForgotEmail(email || TEST_USER.email);
+                  setForgotError(undefined);
+                  setStep("10_forgot_password");
+                }}
                 style={{ alignSelf: "flex-end" }}
               >
                 <AppText variant="body2" color={colors.grayscale[100]}>
@@ -218,7 +375,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Divisor "Ou" (Divider Container 388x19) */}
+            {/* Divisor "Ou" */}
             <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
               <View style={styles.orBadge}>
@@ -230,14 +387,8 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
 
             {/* Botões Sociais */}
             <View style={{ gap: 16 }}>
-              <SocialButton
-                provider="google"
-                onPress={() => setStep("09_verification")}
-              />
-              <SocialButton
-                provider="apple"
-                onPress={() => setStep("09_verification")}
-              />
+              <SocialButton provider="google" onPress={handleSocialLogin} />
+              <SocialButton provider="apple" onPress={handleSocialLogin} />
             </View>
           </View>
 
@@ -247,15 +398,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
               title="Entrar"
               variant="primary"
               size="large"
-              onPress={() => {
-                if (step === "05_login_default") {
-                  setStep("06_login_error");
-                } else if (step === "06_login_error") {
-                  setStep("08_login_fill");
-                } else {
-                  setStep("09_verification");
-                }
-              }}
+              onPress={handleSubmitLogin}
             />
 
             <TouchableOpacity
@@ -299,7 +442,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
                 align="center"
               >
                 {"Digite o código de 6 dígitos que enviamos para\n"}
-                {email}
+                {email} (código de teste: {TEST_USER.otp})
               </AppText>
             </View>
 
@@ -313,6 +456,9 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
                     digit.length > 0 && {
                       borderColor: colors.grayscale[100],
                     },
+                    otpError && {
+                      borderColor: colors.message[200],
+                    },
                   ]}
                 >
                   <AppText variant="headline" color={colors.grayscale[100]}>
@@ -322,16 +468,29 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
               ))}
             </View>
 
+            {otpError ? (
+              <AppText
+                variant="footnote"
+                color={colors.message[200]}
+                align="center"
+              >
+                {otpError}
+              </AppText>
+            ) : null}
+
             <View style={styles.resendBlock}>
               <AppText variant="body2" color={colors.grayscale[100]}>
                 Não recebeu o código?
               </AppText>
               <TouchableOpacity
                 activeOpacity={0.75}
-                onPress={() => setOtpDigits(["8", "5", "6", "3", "4", "6"])}
+                onPress={() => {
+                  setOtpDigits(["1", "2", "3", "4", "5", "6"]);
+                  setOtpError(undefined);
+                }}
               >
                 <AppText variant="headline" color={colors.primary[100]}>
-                  Reenviar código
+                  Reenviar código ({TEST_USER.otp})
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -340,7 +499,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
               title="Verificar"
               variant="primary"
               size="large"
-              onPress={onLoginSuccess}
+              onPress={handleVerifyOtp}
             />
           </View>
 
@@ -356,6 +515,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
         <ScrollView
           contentContainerStyle={styles.contentScroll}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={{ alignSelf: "flex-start" }}>
             <CircleIconButton
@@ -387,25 +547,29 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
             <FormInput
               label="E-mail"
               placeholder="Digite seu e-mail"
-              value={email}
-              onChangeText={setEmail}
-              state="field"
+              value={forgotEmail}
+              onChangeText={(txt) => {
+                setForgotEmail(txt);
+                setForgotError(undefined);
+              }}
+              state={forgotError ? "error" : "field"}
+              errorMessage={forgotError}
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </View>
 
-          <View style={[styles.bottomButtonSection, { marginTop: 120 }]}>
+          <View style={[styles.bottomButtonSection, { marginTop: 80 }]}>
             <Button
               title="Enviar Link de Recuperação"
               variant="primary"
               size="large"
-              onPress={() => setStep("11_reset_password")}
+              onPress={handleSendRecoveryLink}
             />
 
             <TouchableOpacity
               activeOpacity={0.75}
-              onPress={() => setStep("05_login_default")}
+              onPress={() => setStep("08_login_fill")}
               style={{ alignSelf: "center", paddingVertical: 6 }}
             >
               <AppText variant="headline" color={colors.primary[100]}>
@@ -422,6 +586,7 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
           <ScrollView
             contentContainerStyle={styles.contentScroll}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={{ alignSelf: "flex-start" }}>
               <CircleIconButton
@@ -452,26 +617,33 @@ export const LoginFlowScreenView: React.FC<LoginFlowScreenProps> = ({
                 label="Nova Senha"
                 placeholder="Digite a nova senha"
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={(txt) => {
+                  setNewPassword(txt);
+                  setResetError(undefined);
+                }}
                 isPassword
-                state="field"
+                state={resetError ? "error" : "field"}
+                errorMessage={resetError}
               />
               <FormInput
                 label="Confirmar Senha"
                 placeholder="Confirme a nova senha"
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(txt) => {
+                  setConfirmPassword(txt);
+                  setResetError(undefined);
+                }}
                 isPassword
-                state="field"
+                state={resetError ? "error" : "field"}
               />
             </View>
 
-            <View style={[styles.bottomButtonSection, { marginTop: 80 }]}>
+            <View style={[styles.bottomButtonSection, { marginTop: 60 }]}>
               <Button
                 title="Redefinir Senha"
                 variant="primary"
                 size="large"
-                onPress={() => setStep("12_reset_modal")}
+                onPress={handleConfirmResetPassword}
               />
             </View>
           </ScrollView>
@@ -502,41 +674,43 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
     justifyContent: "space-between",
-  },
-  subNavWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  subNavScroll: {
-    gap: 6,
-    paddingVertical: 4,
-  },
-  subPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-  },
-  subPillActive: {
-    backgroundColor: colors.accent[200],
-    borderColor: colors.accent[200],
   },
   contentScroll: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,
-    gap: 28,
+    gap: 22,
   },
   welcomeBlock: {
     alignItems: "center",
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
+  },
+  testHelperBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    backgroundColor: colors.grayscale[500],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: "rgba(69, 197, 136, 0.35)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  testBannerBtnSecondary: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.grayscale[400],
+  },
+  testBannerBtnPrimary: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.primary[100],
   },
   formContainer: {
     width: "100%",
@@ -563,7 +737,7 @@ const styles = StyleSheet.create({
   bottomButtonSection: {
     width: "100%",
     gap: 18,
-    marginTop: 12,
+    marginTop: 8,
   },
   switchAuthRow: {
     flexDirection: "row",
@@ -577,7 +751,7 @@ const styles = StyleSheet.create({
   verificationTopContent: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    gap: 24,
+    gap: 20,
     alignItems: "center",
   },
   otpSixRow: {
@@ -587,7 +761,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   otpBox51: {
-    width: 51,
+    flex: 1,
+    maxWidth: 51,
     height: 51,
     borderRadius: radii.md,
     backgroundColor: colors.grayscale[600],
@@ -607,4 +782,3 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
-

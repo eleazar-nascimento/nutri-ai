@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -8,6 +7,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
+import { Sparkles } from "lucide-react-native";
 import { colors, radii } from "@/theme";
 import {
   AppText,
@@ -21,11 +21,17 @@ import {
   FormInput,
   MessageModalCard,
   PaymentMethodCard,
-  PortfolioNavBar,
   ProfileAvatar,
   Toggle,
   TopBar,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
+import {
+  useAppStore,
+  useAccount,
+  DIET_CATALOG,
+  DietPlan,
+} from "@/store";
 
 export type SettingsSubScreen =
   | "33_settings"
@@ -43,49 +49,6 @@ export type SettingsSubScreen =
   | "45_help"
   | "46_delete_account"
   | "47_logout";
-
-interface FavoriteDietItem {
-  id: string;
-  title: string;
-  calories: string;
-  protein: string;
-  carbs: string;
-  fat: string;
-  imageUri: string;
-}
-
-const INITIAL_FAVORITES: FavoriteDietItem[] = [
-  {
-    id: "paleo",
-    title: "Plano Paleo Power",
-    calories: "2.000 kcal",
-    protein: "Proteína: 180g",
-    carbs: "Carbo: 150g",
-    fat: "Gordura: 80g",
-    imageUri:
-      "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "indian-veg",
-    title: "Vegetariano Indiano para Emagrecer",
-    calories: "1.800 kcal",
-    protein: "Proteína: 100g",
-    carbs: "Carbo: 225g",
-    fat: "Gordura: 45g",
-    imageUri:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "mediterranean",
-    title: "Estilo de Vida Mediterrâneo",
-    calories: "2.000 kcal",
-    protein: "Proteína: 120g",
-    carbs: "Carbo: 200g",
-    fat: "Gordura: 70g",
-    imageUri:
-      "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
-  },
-];
 
 const EmptyFavoritesIllustration: React.FC = () => (
   <Svg width={220} height={180} viewBox="0 0 254 216" fill="none">
@@ -137,54 +100,67 @@ const SettingsMenuRow: React.FC<SettingsRowProps> = ({
   >
     <AppText
       variant="body"
-      color={danger ? colors.message.red : colors.grayscale[100]}
+      color={danger ? colors.message[200] : colors.grayscale[100]}
     >
       {label}
     </AppText>
     <ArrowIcon
       direction="right"
       size={20}
-      color={danger ? colors.message.red : colors.grayscale[200]}
+      color={danger ? colors.message[200] : colors.grayscale[200]}
     />
   </TouchableOpacity>
 );
 
 export const SettingsFlowScreen: React.FC = () => {
   const router = useRouter();
+  const {
+    demoMode,
+    setDemoMode,
+    updateProfile,
+    changePassword,
+    setNotificationPref,
+    setSelectedPayment,
+    addCard,
+    toggleFavoriteDiet,
+    deleteAccount,
+    logout,
+  } = useAppStore();
+  const account = useAccount();
+
   const [subScreen, setSubScreen] = useState<SettingsSubScreen>("33_settings");
 
   // Estado 34_My Profile
-  const [profileName, setProfileName] = useState("Jane Cooper");
-  const [profileEmail, setProfileEmail] = useState("janecooper@email.com");
-  const [profileDob, setProfileDob] = useState("21-05-2003");
-  const [profileHeight, setProfileHeight] = useState("1,62 m");
-  const [profileGender, setProfileGender] = useState("Feminino");
-  const [profileWeight, setProfileWeight] = useState("56 kg");
+  const [profileName, setProfileName] = useState(account.profile.name);
+  const [profileEmail, setProfileEmail] = useState(account.profile.email);
+  const [profileDob, setProfileDob] = useState(account.profile.birthDate);
+  const [profileHeight, setProfileHeight] = useState(
+    `${(account.profile.heightCm / 100).toFixed(2).replace(".", ",")} m`
+  );
+  const [profileGender, setProfileGender] = useState(
+    account.profile.gender || "Feminino"
+  );
+  const [profileWeight, setProfileWeight] = useState(
+    `${Math.round(account.profile.weightKg)} kg`
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDay, setSelectedDay] = useState(21);
 
   // Estado 35_Change Password
-  const [newPassword, setNewPassword] = useState("nutri2026");
-  const [confirmPassword, setConfirmPassword] = useState("nutri2026");
-
-  // Estado 37_Notification
-  const [mealReminders, setMealReminders] = useState(true);
-  const [progressSummary, setProgressSummary] = useState(true);
-  const [goalMilestone, setGoalMilestone] = useState(false);
-  const [newPlanRecs, setNewPlanRecs] = useState(true);
+  const [newPassword, setNewPassword] = useState("Nutri@123");
+  const [confirmPassword, setConfirmPassword] = useState("Nutri@123");
+  const [passwordError, setPasswordError] = useState<string | undefined>();
 
   // Estado 38_Payment Method & 39_Add New Card
-  const [selectedPayment, setSelectedPayment] = useState<
-    "googlePay" | "applePay" | "visa"
-  >("visa");
   const [cardNumber, setCardNumber] = useState("4532 •••• •••• 8910");
-  const [cardHolder, setCardHolder] = useState("Jane Cooper");
+  const [cardHolder, setCardHolder] = useState(account.profile.name);
   const [cardExpiry, setCardExpiry] = useState("21-05-2028");
   const [cardCvv, setCardCvv] = useState("425");
 
-  // Estado 41_Favorite
-  const [favorites, setFavorites] =
-    useState<FavoriteDietItem[]>(INITIAL_FAVORITES);
+  // Dietas Favoritas filtradas do catálogo pela store
+  const favoriteDiets = useMemo(() => {
+    return DIET_CATALOG.filter((d) => account.favoriteDietIds.includes(d.id));
+  }, [account.favoriteDietIds]);
 
   const handleBottomTabPress = (tab: BottomMenuTab) => {
     if (tab === "home") router.push("/home" as any);
@@ -194,35 +170,86 @@ export const SettingsFlowScreen: React.FC = () => {
     else if (tab === "settings") setSubScreen("33_settings");
   };
 
-  const toggleFavoriteItem = (id: string) => {
-    setFavorites((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      if (next.length === 0) {
-        setSubScreen("40_favorite_empty");
-      }
-      return next;
+  const handleSaveProfile = () => {
+    const rawHeight = parseFloat(
+      profileHeight.replace(" m", "").replace(",", ".")
+    );
+    const heightCm = !isNaN(rawHeight) ? Math.round(rawHeight * 100) : 162;
+    const rawWeight = parseFloat(
+      profileWeight.replace(" kg", "").replace(",", ".")
+    );
+    const weightKg = !isNaN(rawWeight) ? rawWeight : 56;
+    const gender = profileGender as "Feminino" | "Masculino" | "Outro";
+
+    updateProfile({
+      name: profileName.trim(),
+      email: profileEmail.trim(),
+      birthDate: profileDob,
+      heightCm,
+      weightKg,
+      gender,
     });
+    setSubScreen("33_settings");
+  };
+
+  const handleChangePasswordSubmit = () => {
+    setPasswordError(undefined);
+    if (newPassword.length < 6) {
+      setPasswordError("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("As senhas digitadas não coincidem.");
+      return;
+    }
+    const res = changePassword(account.password || "", newPassword);
+    if (!res.ok) {
+      setPasswordError(res.error);
+      return;
+    }
+    setSubScreen("36_password_changed");
+  };
+
+  const handleAddNewCardSubmit = () => {
+    const last4 = cardNumber.replace(/\D/g, "").slice(-4) || "8910";
+    addCard({
+      brand: "visa",
+      last4,
+      holderName: cardHolder,
+      expiry: cardExpiry,
+    });
+    setSubScreen("38_payment_method");
+  };
+
+  const handleConfirmLogout = () => {
+    logout();
+    router.replace("/login" as any);
+  };
+
+  const handleConfirmDeleteAccount = () => {
+    deleteAccount();
+    router.replace("/" as any);
   };
 
   const subScreenTabs: { key: SettingsSubScreen; label: string }[] = [
-    { key: "33_settings", label: "33_Ajustes" },
-    { key: "34_profile", label: "34_Meu Perfil" },
-    { key: "35_change_password", label: "35_Alterar Senha" },
-    { key: "36_password_changed", label: "36_Senha Alterada" },
-    { key: "37_notification", label: "37_Notificações" },
-    { key: "38_payment_method", label: "38_Pagamento" },
-    { key: "39_add_card", label: "39_Novo Cartão" },
-    { key: "40_favorite_empty", label: "40_Fav Vazio" },
-    { key: "41_favorite", label: "41_Favoritos" },
-    { key: "42_more", label: "42_Mais" },
-    { key: "43_terms", label: "43_Termos" },
-    { key: "44_privacy", label: "44_Privacidade" },
-    { key: "45_help", label: "45_Ajuda" },
-    { key: "46_delete_account", label: "46_Excluir Conta" },
-    { key: "47_logout", label: "47_Sair" },
+    { key: "33_settings", label: "33. Ajustes" },
+    { key: "34_profile", label: "34. Meu Perfil" },
+    { key: "35_change_password", label: "35. Alterar Senha" },
+    { key: "36_password_changed", label: "36. Senha Alterada" },
+    { key: "37_notification", label: "37. Notificações" },
+    { key: "38_payment_method", label: "38. Pagamento" },
+    { key: "39_add_card", label: "39. Novo Cartão" },
+    { key: "40_favorite_empty", label: "40. Fav Vazio" },
+    { key: "41_favorite", label: "41. Favoritos" },
+    { key: "42_more", label: "42. Mais" },
+    { key: "43_terms", label: "43. Termos" },
+    { key: "44_privacy", label: "44. Privacidade" },
+    { key: "45_help", label: "45. Ajuda" },
+    { key: "46_delete_account", label: "46. Excluir Conta" },
+    { key: "47_logout", label: "47. Sair" },
   ];
 
-  // Renderiza o conteúdo base de 33_Settings (também usado ao fundo do modal 47_Log out)
+  // Conteúdo base de 33_Settings
   const renderSettingsMainContent = () => (
     <>
       <View style={styles.topBarWrapper}>
@@ -239,7 +266,7 @@ export const SettingsFlowScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContentWithBottom}
         showsVerticalScrollIndicator={false}
       >
-        {/* User Info Card */}
+        {/* Card do Usuário */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setSubScreen("34_profile")}
@@ -250,14 +277,28 @@ export const SettingsFlowScreen: React.FC = () => {
               type="image"
               size={54}
               showEditBadge={false}
-              imageUri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+              imageUri={account.profile.avatarUri}
             />
             <View style={{ flex: 1, gap: 4 }}>
-              <AppText variant="headline" color={colors.grayscale[100]}>
-                {profileName}
-              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <AppText variant="headline" color={colors.grayscale[100]}>
+                  {account.profile.name}
+                </AppText>
+                {account.subscription.plan !== "none" ? (
+                  <View style={styles.proPill}>
+                    <Sparkles size={10} color={colors.grayscale[600]} />
+                    <AppText
+                      variant="caption2"
+                      color={colors.grayscale[600]}
+                      style={{ fontSize: 10, fontWeight: "700" }}
+                    >
+                      PRO
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
               <AppText variant="body2" color={colors.grayscale[200]}>
-                {profileEmail}
+                {account.profile.email}
               </AppText>
             </View>
             <ArrowIcon
@@ -268,7 +309,26 @@ export const SettingsFlowScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
 
-        {/* Main Settings Card */}
+        {/* Toggle Modo Portfólio / Telas do Figma */}
+        <View style={styles.groupCard}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1, gap: 2, paddingRight: 10 }}>
+              <AppText variant="body" color={colors.grayscale[100]}>
+                Modo Portfólio (Telas do Figma)
+              </AppText>
+              <AppText variant="footnote" color={colors.grayscale[200]}>
+                Exibe as pílulas numéricas de navegação (05_, 23_, 33_, etc.)
+              </AppText>
+            </View>
+            <Toggle
+              size="small"
+              value={demoMode}
+              onValueChange={setDemoMode}
+            />
+          </View>
+        </View>
+
+        {/* Menu Principal */}
         <View style={styles.groupCard}>
           <SettingsMenuRow
             label="Perfil"
@@ -294,21 +354,21 @@ export const SettingsFlowScreen: React.FC = () => {
             label="Favoritos"
             onPress={() =>
               setSubScreen(
-                favorites.length > 0 ? "41_favorite" : "40_favorite_empty"
+                favoriteDiets.length > 0 ? "41_favorite" : "40_favorite_empty"
               )
             }
           />
         </View>
 
-        {/* More Container */}
+        {/* Mais */}
         <View style={styles.groupCard}>
           <SettingsMenuRow
-            label="Mais"
+            label="Mais (Termos, Privacidade & Ajuda)"
             onPress={() => setSubScreen("42_more")}
           />
         </View>
 
-        {/* Log Out Container */}
+        {/* Sair da Conta */}
         <View style={styles.groupCard}>
           <SettingsMenuRow
             label="Sair da Conta"
@@ -324,7 +384,7 @@ export const SettingsFlowScreen: React.FC = () => {
     </>
   );
 
-  // Renderiza o conteúdo base de 42_More (também usado ao fundo do modal 46_Delete Account)
+  // Conteúdo base de 42_More
   const renderMoreContent = () => (
     <>
       <View style={styles.topBarWrapper}>
@@ -370,35 +430,13 @@ export const SettingsFlowScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <PortfolioNavBar />
-
-      {/* Seletor das 15 sub-telas do Passo 9 (33 a 47) */}
-      <View style={styles.subSwitcherBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, paddingHorizontal: 16 }}
-        >
-          {subScreenTabs.map((item) => {
-            const active = subScreen === item.key;
-            return (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => setSubScreen(item.key)}
-                style={[styles.subChip, active && styles.subChipActive]}
-              >
-                <AppText
-                  variant="caption2"
-                  color={active ? colors.grayscale[600] : colors.grayscale[200]}
-                >
-                  {item.label}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+    <View style={styles.screenContainer}>
+      {/* Pílulas de etapas (visíveis apenas no Modo Demo) */}
+      <DemoStepPills
+        steps={subScreenTabs}
+        active={subScreen}
+        onChange={(k: SettingsSubScreen) => setSubScreen(k)}
+      />
 
       <View style={styles.frame}>
         {/* 33_Settings & 47_Log out */}
@@ -411,14 +449,14 @@ export const SettingsFlowScreen: React.FC = () => {
                 <MessageModalCard
                   mode="dualAction"
                   showUser
-                  userName={profileName}
-                  avatarUri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+                  userName={account.profile.name}
+                  avatarUri={account.profile.avatarUri}
                   title={"Tem certeza de que deseja\nsair da conta?"}
                   subtitle="Sair da conta removerá seu acesso ao acompanhamento personalizado e aos dados salvos até que você entre novamente."
                   secondaryLabel="Cancelar"
                   primaryLabel="Sair"
                   onSecondaryPress={() => setSubScreen("33_settings")}
-                  onPrimaryPress={() => router.push("/login" as any)}
+                  onPrimaryPress={handleConfirmLogout}
                 />
               </View>
             )}
@@ -441,13 +479,14 @@ export const SettingsFlowScreen: React.FC = () => {
               style={{ flex: 1 }}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <View style={{ alignItems: "center", marginVertical: 10 }}>
                 <ProfileAvatar
                   type="image"
                   size={84}
                   showEditBadge
-                  imageUri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+                  imageUri={account.profile.avatarUri}
                 />
               </View>
 
@@ -508,7 +547,9 @@ export const SettingsFlowScreen: React.FC = () => {
                     label="Gênero"
                     value={profileGender}
                     options={["Feminino", "Masculino", "Outro"]}
-                    onSelect={setProfileGender}
+                    onSelect={(opt) =>
+                      setProfileGender(opt as "Feminino" | "Masculino" | "Outro")
+                    }
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -523,10 +564,10 @@ export const SettingsFlowScreen: React.FC = () => {
 
               <View style={{ marginTop: 16 }}>
                 <Button
-                  title="Salvar"
+                  title="Salvar Alterações"
                   variant="primary"
                   fullWidth
-                  onPress={() => setSubScreen("33_settings")}
+                  onPress={handleSaveProfile}
                 />
               </View>
             </ScrollView>
@@ -550,29 +591,39 @@ export const SettingsFlowScreen: React.FC = () => {
               style={{ flex: 1 }}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <FormInput
                 label="Nova Senha"
                 placeholder="Digite a nova senha"
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={(txt) => {
+                  setNewPassword(txt);
+                  setPasswordError(undefined);
+                }}
                 isPassword
+                state={passwordError ? "error" : "field"}
+                errorMessage={passwordError}
               />
 
               <FormInput
                 label="Confirmar Senha"
                 placeholder="Confirme a nova senha"
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(txt) => {
+                  setConfirmPassword(txt);
+                  setPasswordError(undefined);
+                }}
                 isPassword
+                state={passwordError ? "error" : "field"}
               />
 
               <View style={{ marginTop: 20 }}>
                 <Button
-                  title="Salvar"
+                  title="Salvar Senha"
                   variant="primary"
                   fullWidth
-                  onPress={() => setSubScreen("36_password_changed")}
+                  onPress={handleChangePasswordSubmit}
                 />
               </View>
             </ScrollView>
@@ -582,8 +633,8 @@ export const SettingsFlowScreen: React.FC = () => {
                 <MessageModalCard
                   mode="singleAction"
                   showUser
-                  userName={profileName}
-                  avatarUri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+                  userName={account.profile.name}
+                  avatarUri={account.profile.avatarUri}
                   title="Senha alterada"
                   subtitle={"Parabéns! Sua senha foi\natualizada com sucesso!"}
                   primaryLabel="Voltar"
@@ -618,8 +669,10 @@ export const SettingsFlowScreen: React.FC = () => {
                   </AppText>
                   <Toggle
                     size="small"
-                    value={mealReminders}
-                    onValueChange={setMealReminders}
+                    value={account.notificationPrefs.mealReminders}
+                    onValueChange={(val) =>
+                      setNotificationPref("mealReminders", val)
+                    }
                   />
                 </View>
 
@@ -629,8 +682,10 @@ export const SettingsFlowScreen: React.FC = () => {
                   </AppText>
                   <Toggle
                     size="small"
-                    value={progressSummary}
-                    onValueChange={setProgressSummary}
+                    value={account.notificationPrefs.progressSummary}
+                    onValueChange={(val) =>
+                      setNotificationPref("progressSummary", val)
+                    }
                   />
                 </View>
 
@@ -640,8 +695,13 @@ export const SettingsFlowScreen: React.FC = () => {
                   </AppText>
                   <Toggle
                     size="small"
-                    value={goalMilestone}
-                    onValueChange={setGoalMilestone}
+                    value={Boolean(
+                      account.notificationPrefs.goalMilestones ??
+                        account.notificationPrefs.goalMilestone
+                    )}
+                    onValueChange={(val) =>
+                      setNotificationPref("goalMilestones", val)
+                    }
                   />
                 </View>
 
@@ -651,8 +711,10 @@ export const SettingsFlowScreen: React.FC = () => {
                   </AppText>
                   <Toggle
                     size="small"
-                    value={newPlanRecs}
-                    onValueChange={setNewPlanRecs}
+                    value={account.notificationPrefs.newPlanRecs}
+                    onValueChange={(val) =>
+                      setNotificationPref("newPlanRecs", val)
+                    }
                   />
                 </View>
               </View>
@@ -682,21 +744,21 @@ export const SettingsFlowScreen: React.FC = () => {
                   brand="googlePay"
                   title="Google Pay"
                   selectable
-                  selected={selectedPayment === "googlePay"}
+                  selected={account.selectedPayment === "googlePay"}
                   onPress={() => setSelectedPayment("googlePay")}
                 />
                 <PaymentMethodCard
                   brand="applePay"
                   title="Apple Pay"
                   selectable
-                  selected={selectedPayment === "applePay"}
+                  selected={account.selectedPayment === "applePay"}
                   onPress={() => setSelectedPayment("applePay")}
                 />
                 <PaymentMethodCard
                   brand="visa"
                   title="Visa •••• 8910"
                   selectable
-                  selected={selectedPayment === "visa"}
+                  selected={account.selectedPayment === "visa"}
                   onPress={() => setSelectedPayment("visa")}
                 />
               </View>
@@ -729,6 +791,7 @@ export const SettingsFlowScreen: React.FC = () => {
               style={{ flex: 1 }}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <FormInput
                 label="Número do Cartão"
@@ -768,10 +831,7 @@ export const SettingsFlowScreen: React.FC = () => {
                   title="Adicionar"
                   variant="primary"
                   fullWidth
-                  onPress={() => {
-                    setSelectedPayment("visa");
-                    setSubScreen("38_payment_method");
-                  }}
+                  onPress={handleAddNewCardSubmit}
                 />
               </View>
             </ScrollView>
@@ -810,12 +870,9 @@ export const SettingsFlowScreen: React.FC = () => {
                 </AppText>
               </View>
               <Button
-                title="Restaurar Favoritos de Exemplo"
+                title="Explorar Dietas no Catálogo"
                 variant="outline"
-                onPress={() => {
-                  setFavorites(INITIAL_FAVORITES);
-                  setSubScreen("41_favorite");
-                }}
+                onPress={() => router.push("/diets" as any)}
               />
             </View>
           </View>
@@ -838,20 +895,28 @@ export const SettingsFlowScreen: React.FC = () => {
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {favorites.map((diet) => (
-                <DietCard
-                  key={diet.id}
-                  title={diet.title}
-                  calories={diet.calories}
-                  protein={diet.protein}
-                  carbs={diet.carbs}
-                  fat={diet.fat}
-                  imageUri={diet.imageUri}
-                  favorited
-                  onFavoriteToggle={() => toggleFavoriteItem(diet.id)}
-                  onPress={() => router.push("/diets" as any)}
-                />
-              ))}
+              {favoriteDiets.length === 0 ? (
+                <View style={styles.emptyStateCenter}>
+                  <AppText variant="body" color={colors.grayscale[200]}>
+                    Nenhum item marcado como favorito.
+                  </AppText>
+                </View>
+              ) : (
+                favoriteDiets.map((diet) => (
+                  <DietCard
+                    key={diet.id}
+                    title={diet.title}
+                    calories={diet.calories}
+                    protein={diet.protein}
+                    carbs={diet.carbs}
+                    fat={diet.fat}
+                    imageUri={diet.imageUri}
+                    favorited
+                    onFavoriteToggle={() => toggleFavoriteDiet(diet.id)}
+                    onPress={() => router.push("/diets" as any)}
+                  />
+                ))
+              )}
             </ScrollView>
           </View>
         )}
@@ -866,14 +931,14 @@ export const SettingsFlowScreen: React.FC = () => {
                 <MessageModalCard
                   mode="dualAction"
                   showUser
-                  userName={profileName}
-                  avatarUri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+                  userName={account.profile.name}
+                  avatarUri={account.profile.avatarUri}
                   title={"Tem certeza de que deseja\nexcluir sua conta?"}
                   subtitle="Isso removerá permanentemente seus dados e encerrará sua conta no NutriAI."
                   secondaryLabel="Cancelar"
                   primaryLabel="Excluir"
                   onSecondaryPress={() => setSubScreen("42_more")}
-                  onPrimaryPress={() => router.push("/" as any)}
+                  onPrimaryPress={handleConfirmDeleteAccount}
                 />
               </View>
             )}
@@ -907,12 +972,6 @@ export const SettingsFlowScreen: React.FC = () => {
                 Condições antes de utilizar o aplicativo móvel NutriAI.
               </AppText>
 
-              <AppText variant="body2" color={colors.grayscale[200]}>
-                Ao utilizar o NutriAI, você concorda em cumprir estes Termos.
-                Caso não concorde com qualquer parte dos Termos, recomendamos
-                não acessar ou utilizar o aplicativo.
-              </AppText>
-
               <View style={styles.legalSection}>
                 <AppText variant="headline" color={colors.grayscale[100]}>
                   1. Elegibilidade
@@ -930,44 +989,9 @@ export const SettingsFlowScreen: React.FC = () => {
                 </AppText>
                 <AppText variant="body2" color={colors.grayscale[200]}>
                   O NutriAI oferece monitoramento de calorias, insights
-                  nutricionais e recomendações geradas por IA. No entanto:
+                  nutricionais e recomendações geradas por IA. No entanto o NutriAI
+                  não é um provedor médico ou de saúde e não substitui acompanhamento clínico.
                 </AppText>
-                <View style={styles.bulletList}>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • O NutriAI não é um provedor médico ou de saúde.
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • O aplicativo não substitui consultas médicas ou
-                    nutricionais profissionais.
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Consulte sempre um médico ou nutricionista antes de
-                    iniciar qualquer dieta ou programa alimentar.
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.legalSection}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  3. Contas de Usuário
-                </AppText>
-                <AppText variant="body2" color={colors.grayscale[200]}>
-                  Ao criar uma conta conosco:
-                </AppText>
-                <View style={styles.bulletList}>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Você concorda em fornecer informações verdadeiras,
-                    completas e atualizadas.
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Você é responsável por manter a confidencialidade de suas
-                    credenciais de acesso.
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Não é permitido compartilhar sua conta ou se passar por
-                    outra pessoa.
-                  </AppText>
-                </View>
               </View>
             </ScrollView>
           </View>
@@ -995,69 +1019,9 @@ export const SettingsFlowScreen: React.FC = () => {
               </AppText>
 
               <AppText variant="body2" color={colors.grayscale[200]}>
-                Obrigado por confiar no NutriAI. Sua privacidade é fundamental
-                para nós. Esta Política de Privacidade explica como coletamos,
-                usamos e protegemos suas informações pessoais no aplicativo
-                NutriAI.
+                Obrigado por confiar no NutriAI. Seus dados são salvos localmente
+                e nunca compartilhados sem sua autorização explícita.
               </AppText>
-
-              <AppText variant="body2" color={colors.grayscale[200]}>
-                Ao utilizar o NutriAI, você concorda com as práticas descritas
-                nesta Política.
-              </AppText>
-
-              <View style={styles.legalSection}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  1. Como Usamos Seus Dados
-                </AppText>
-                <AppText variant="body2" color={colors.grayscale[200]}>
-                  Utilizamos as informações coletadas para:
-                </AppText>
-                <View style={styles.bulletList}>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Personalizar sua experiência de dieta e contagem de
-                    calorias
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Oferecer sugestões de refeições e análises por IA
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Monitorar seu progresso e metas de saúde
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Aprimorar as funcionalidades e a experiência do aplicativo
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Enviar comunicações importantes (notificações e
-                    atualizações)
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.legalSection}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  2. Como Compartilhamos Suas Informações
-                </AppText>
-                <AppText variant="body" color={colors.primary[100]}>
-                  Nós não vendemos seus dados pessoais.
-                </AppText>
-                <AppText variant="body2" color={colors.grayscale[200]}>
-                  Podemos compartilhar dados limitados apenas com:
-                </AppText>
-                <View style={styles.bulletList}>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Provedores de infraestrutura (hospedagem, análise e envio
-                    de mensagens)
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Integrações de terceiros autorizadas por você (Google Fit,
-                    Apple Saúde)
-                  </AppText>
-                  <AppText variant="body2" color={colors.grayscale[200]}>
-                    • Autoridades legais quando exigido por lei
-                  </AppText>
-                </View>
-              </View>
             </ScrollView>
           </View>
         )}
@@ -1079,125 +1043,33 @@ export const SettingsFlowScreen: React.FC = () => {
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={{ gap: 4 }}>
-                <AppText variant="title3" color={colors.grayscale[100]}>
-                  Precisa de Ajuda?
+              <View style={styles.groupCard}>
+                <AppText variant="headline" color={colors.grayscale[100]}>
+                  Central de Ajuda & FAQ
                 </AppText>
                 <AppText variant="body2" color={colors.grayscale[200]}>
-                  Estamos aqui para guiar você em cada passo do caminho.
+                  • Como registrar uma refeição pelo Scan IA{"\n"}
+                  • Como alterar metas diárias no Perfil{"\n"}
+                  • Como cancelar ou renovar a assinatura Premium
                 </AppText>
-              </View>
-
-              <View style={styles.groupCard}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  Tópicos Rápidos de Ajuda
-                </AppText>
-
-                <View style={{ gap: 12, marginTop: 8 }}>
-                  <View style={{ gap: 2 }}>
-                    <AppText variant="body" color={colors.primary[100]}>
-                      • Como registrar uma refeição
-                    </AppText>
-                    <AppText variant="body2" color={colors.grayscale[200]}>
-                      Guia passo a passo para escanear e acompanhar seus
-                      alimentos
-                    </AppText>
-                  </View>
-
-                  <View style={{ gap: 2 }}>
-                    <AppText variant="body" color={colors.primary[100]}>
-                      • Definindo sua meta de calorias
-                    </AppText>
-                    <AppText variant="body2" color={colors.grayscale[200]}>
-                      Entenda como o NutriAI calcula suas metas diárias
-                    </AppText>
-                  </View>
-
-                  <View style={{ gap: 2 }}>
-                    <AppText variant="body" color={colors.primary[100]}>
-                      • Escolhendo um plano alimentar
-                    </AppText>
-                    <AppText variant="body2" color={colors.grayscale[200]}>
-                      Descubra qual protocolo funciona melhor para seus
-                      objetivos
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.groupCard}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  Fale com o Suporte
-                </AppText>
-                <AppText variant="body2" color={colors.grayscale[200]}>
-                  Não encontrou o que estava procurando?
-                </AppText>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setSubScreen("33_settings")}
-                  style={{ paddingVertical: 4 }}
-                >
-                  <AppText variant="headline" color={colors.primary[100]}>
-                    [ Enviar uma Mensagem ]
-                  </AppText>
-                </TouchableOpacity>
-                <AppText variant="footnote" color={colors.grayscale[200]}>
-                  Costumamos responder em até 24 horas.
-                </AppText>
-              </View>
-
-              <View style={styles.groupCard}>
-                <AppText variant="headline" color={colors.grayscale[100]}>
-                  Links Úteis
-                </AppText>
-                <View style={{ gap: 10, marginTop: 4 }}>
-                  <TouchableOpacity onPress={() => setSubScreen("44_privacy")}>
-                    <AppText variant="body" color={colors.primary[100]}>
-                      Política de Privacidade →
-                    </AppText>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setSubScreen("43_terms")}>
-                    <AppText variant="body" color={colors.primary[100]}>
-                      Termos e Condições →
-                    </AppText>
-                  </TouchableOpacity>
-                </View>
               </View>
             </ScrollView>
           </View>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  screenContainer: {
     flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-  subSwitcherBar: {
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.grayscale[500],
-  },
-  subChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-  },
-  subChipActive: {
-    backgroundColor: colors.accent[200],
+    backgroundColor: colors.grayscale[600],
   },
   frame: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
   },
   topBarWrapper: {
@@ -1229,6 +1101,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
   },
+  proPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: colors.accent[200],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+  },
   groupCard: {
     backgroundColor: colors.grayscale[500],
     borderRadius: radii.lg,
@@ -1252,7 +1133,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
   twoColRow: {
     flexDirection: "row",
@@ -1272,10 +1153,6 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: colors.grayscale[400],
-  },
-  bulletList: {
-    gap: 6,
-    paddingLeft: 4,
   },
   bottomMenuFixed: {
     position: "absolute",

@@ -275,16 +275,13 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    minHeight: 840,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
     justifyContent: "space-between",
     overflow: "hidden",
   },
   heroSection: {
     alignItems: "center",
-    marginTop: 88,
+    marginTop: 56,
     paddingHorizontal: 24,
   },
   taglineContainer: {

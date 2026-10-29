@@ -1,27 +1,22 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "@/theme";
-import { PortfolioNavBar } from "@/components/ui";
+import { Screen } from "@/components/layout";
 import { OnboardingScreenView } from "@/modules/onboarding";
+import { useAppStore } from "@/store";
 
 export default function OnboardingRoute() {
   const router = useRouter();
+  const { markOnboardingSeen } = useAppStore();
 
   return (
-    <SafeAreaView style={styles.root}>
-      <PortfolioNavBar />
+    <Screen>
       <OnboardingScreenView
-        onBackToSplash={() => router.push("/")}
-        onFinish={() => router.push("/login" as any)}
+        onBackToSplash={() => router.push("/" as any)}
+        onFinish={() => {
+          markOnboardingSeen();
+          router.push("/login" as any);
+        }}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-});

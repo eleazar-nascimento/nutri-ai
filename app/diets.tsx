@@ -1,8 +1,7 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "@/theme";
-import { PortfolioNavBar, BottomMenuTab } from "@/components/ui";
+import { BottomMenuTab } from "@/components/ui";
+import { Screen } from "@/components/layout";
 import { DietsFlowScreenView } from "@/modules/diets";
 
 export default function DietsRoute() {
@@ -17,20 +16,12 @@ export default function DietsRoute() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <PortfolioNavBar />
+    <Screen>
       <DietsFlowScreenView
         onBack={() => router.push("/home" as any)}
         onNavigateTab={handleTabPress}
+        onOpenPremium={() => router.push("/premium" as any)}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.grayscale[600],
-  },
-});
-

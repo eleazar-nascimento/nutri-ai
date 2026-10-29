@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   ScrollView,
@@ -6,7 +6,7 @@ import {
   Image,
   StyleSheet,
 } from "react-native";
-import { UtensilsCrossed } from "lucide-react-native";
+import { UtensilsCrossed, Sparkles, Check } from "lucide-react-native";
 import { colors, radii } from "@/theme";
 import {
   AppText,
@@ -19,126 +19,20 @@ import {
   BottomMenu,
   BottomMenuTab,
 } from "@/components/ui";
+import { DemoStepPills } from "@/components/layout";
+import {
+  useAppStore,
+  useAccount,
+  DIET_CATALOG,
+  DietPlan,
+  todayKey,
+} from "@/store";
 
 export type DietsSubScreen =
   | "27_all_diets"
   | "28_diet_details"
   | "29_my_diets_empty"
   | "30_my_diets_list";
-
-export interface DietPlanItem {
-  id: string;
-  title: string;
-  calories: string;
-  protein: string;
-  carbs: string;
-  fat: string;
-  imageUri: string;
-  description: string;
-  goal: string;
-}
-
-const ALL_DIET_PLANS: DietPlanItem[] = [
-  {
-    id: "mediterranean",
-    title: "Estilo de Vida Mediterrâneo",
-    calories: "2.000 kcal",
-    protein: "Proteína: 120g",
-    carbs: "Carbo: 200g",
-    fat: "Gordura: 70g",
-    imageUri:
-      "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&auto=format&fit=crop&q=80",
-    description:
-      "Esta dieta foca em alimentos integrais, apresentando vegetais frescos, azeite de oliva de qualidade, peixes magros, castanhas nutritivas e grãos saudáveis. Oferece uma forma equilibrada e saborosa de se alimentar que apoia a sua saúde.",
-    goal: "Saúde do Coração, Manutenção de Peso",
-  },
-  {
-    id: "keto",
-    title: "Partida Cetogênica (Keto)",
-    calories: "1.800 kcal",
-    protein: "Proteína: 70g",
-    carbs: "Carbo: 30g",
-    fat: "Gordura: 105g",
-    imageUri:
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
-    description:
-      "Plano com baixo teor de carboidratos e rico em gorduras boas para estimular a cetose natural, promovendo saciedade prolongada e energia constante ao longo do dia.",
-    goal: "Queima de Gordura, Energia Contínua",
-  },
-];
-
-const MY_DIET_PLANS: DietPlanItem[] = [
-  {
-    id: "lowcarb",
-    title: "Queima de Gordura Low-Carb",
-    calories: "1.800 kcal",
-    protein: "Proteína: 160g",
-    carbs: "Carbo: 100g",
-    fat: "Gordura: 80g",
-    imageUri:
-      "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&auto=format&fit=crop&q=80",
-    description:
-      "Estratégia reduzida em carboidratos simples e reforçada em proteínas magras para acelerar o metabolismo e preservar a massa muscular.",
-    goal: "Redução de Gordura Corporal",
-  },
-  {
-    id: "vegan",
-    title: "Vitalidade Vegana",
-    calories: "2.000 kcal",
-    protein: "Proteína: 125g",
-    carbs: "Carbo: 300g",
-    fat: "Gordura: 55g",
-    imageUri:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80",
-    description:
-      "Cardápio 100% vegetal rico em leguminosas, grãos ancestrais, sementes e antioxidantes naturais para máxima vitalidade.",
-    goal: "Bem-Estar Geral, Longevidade",
-  },
-  {
-    id: "detox",
-    title: "Plano Detox Purificante",
-    calories: "1.500 kcal",
-    protein: "Proteína: 95g",
-    carbs: "Carbo: 180g",
-    fat: "Gordura: 45g",
-    imageUri:
-      "https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=800&auto=format&fit=crop&q=80",
-    description:
-      "Focado em alimentos leves, folhas verdes, frutas cítricas e hidratação intensiva para desinchar e renovar sua digestão.",
-    goal: "Desintoxicação, Leveza Digestiva",
-  },
-];
-
-const DIET_DETAIL_MACROS = [
-  {
-    name: "Carbos",
-    current: "40%",
-    max: "100%",
-    progress: 0.4,
-    bg: colors.accent[200], // #F5F378
-  },
-  {
-    name: "Proteínas",
-    current: "25%",
-    max: "100%",
-    progress: 0.25,
-    bg: colors.accent[300], // #45C588
-  },
-  {
-    name: "Calorias",
-    current: "2.000 kcal",
-    max: "100%",
-    progress: 0.78,
-    bg: colors.accent[100], // #DDC0FF
-  },
-  {
-    name: "Gorduras",
-    current: "35%",
-    max: "100%",
-    progress: 0.35,
-    bg: colors.accent[400], // #FF6F43
-  },
-];
 
 const DIET_PILLS: { key: DietsSubScreen; label: string }[] = [
   { key: "27_all_diets", label: "27. Todas as Dietas" },
@@ -150,63 +44,107 @@ const DIET_PILLS: { key: DietsSubScreen; label: string }[] = [
 export interface DietsFlowScreenProps {
   onBack?: () => void;
   onNavigateTab?: (tab: BottomMenuTab) => void;
+  onOpenPremium?: () => void;
 }
 
 /**
  * Módulo 8 — 27_Diets, 28_Diet details, 29_My Diets-Empty, 30_My Diets
- * (Figma Nodes 63001:3237, 63004:2934, 63005:3126, 63005:3544)
  */
 export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
   onBack,
   onNavigateTab,
+  onOpenPremium,
 }) => {
-  const [subScreen, setSubScreen] = useState<DietsSubScreen>("27_all_diets");
-  const [selectedDiet, setSelectedDiet] = useState<DietPlanItem>(
-    ALL_DIET_PLANS[0]
-  );
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({
-    mediterranean: true,
-    lowcarb: true,
-  });
+  const { demoMode, toggleFavoriteDiet, toggleMyDiet, addMeal } = useAppStore();
+  const account = useAccount();
 
-  const toggleFav = (id: string) => {
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+  const [subScreen, setSubScreen] = useState<DietsSubScreen>("27_all_diets");
+  const [selectedDiet, setSelectedDiet] = useState<DietPlan>(DIET_CATALOG[0]);
+  const [justLoggedMeal, setJustLoggedMeal] = useState(false);
+
+  const isPremium = account.subscription.plan !== "none";
+
+  const myDiets = useMemo(() => {
+    return DIET_CATALOG.filter((d) => account.myDietIds.includes(d.id));
+  }, [account.myDietIds]);
+
+  const isSelectedDietInMyDiets = account.myDietIds.includes(selectedDiet.id);
+  const isSelectedDietFavorited = account.favoriteDietIds.includes(selectedDiet.id);
+
+  const tabIndex =
+    subScreen === "27_all_diets" || subScreen === "28_diet_details" ? 0 : 1;
+
+  const handleSelectTab = (idx: number) => {
+    if (idx === 0) {
+      setSubScreen("27_all_diets");
+    } else {
+      setSubScreen(myDiets.length === 0 ? "29_my_diets_empty" : "30_my_diets_list");
+    }
   };
 
-  const tabIndex = subScreen === "27_all_diets" ? 0 : 1;
+  const handleToggleMyDietAction = (diet: DietPlan) => {
+    if (diet.premium && !isPremium && !isSelectedDietInMyDiets) {
+      onOpenPremium?.();
+      return;
+    }
+    toggleMyDiet(diet.id);
+  };
+
+  const handleLogDietSampleMeal = () => {
+    const meal = selectedDiet.dailyMeals[0] || {
+      name: `Refeição: ${selectedDiet.title}`,
+      calories: 450,
+      carbs: 35,
+      protein: 30,
+      fat: 12,
+    };
+    addMeal({
+      dateKey: todayKey(),
+      name: meal.name,
+      source: "diet",
+      calories: meal.calories,
+      carbs: meal.carbs,
+      protein: meal.protein,
+      fat: meal.fat,
+      imageUri: selectedDiet.imageUri,
+    });
+    setJustLoggedMeal(true);
+    setTimeout(() => setJustLoggedMeal(false), 2400);
+  };
+
+  const dietDetailMacros = [
+    {
+      name: "Carbos",
+      current: selectedDiet.carbs,
+      bg: colors.accent[200],
+    },
+    {
+      name: "Proteínas",
+      current: selectedDiet.protein,
+      bg: colors.accent[300],
+    },
+    {
+      name: "Calorias",
+      current: selectedDiet.calories,
+      bg: colors.accent[100],
+    },
+    {
+      name: "Gorduras",
+      current: selectedDiet.fat,
+      bg: colors.accent[400],
+    },
+  ];
 
   return (
     <View style={styles.screenContainer}>
       <StatusBarMock variant="white" />
 
-      {/* Seletor rápido das 4 telas do Passo 8 */}
-      <View style={styles.subNavWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.subNavScroll}
-        >
-          {DIET_PILLS.map((p) => {
-            const active = subScreen === p.key;
-            return (
-              <TouchableOpacity
-                key={p.key}
-                onPress={() => setSubScreen(p.key)}
-                style={[styles.subPill, active && styles.subPillActive]}
-              >
-                <AppText
-                  variant="footnote"
-                  color={
-                    active ? colors.grayscale[600] : colors.grayscale[200]
-                  }
-                >
-                  {p.label}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Pílulas de etapas (visíveis apenas no Modo Demo) */}
+      <DemoStepPills
+        steps={DIET_PILLS}
+        active={subScreen}
+        onChange={(k: DietsSubScreen) => setSubScreen(k)}
+      />
 
       {/* TELA 28 — DIET DETAILS (63004:2934) */}
       {subScreen === "28_diet_details" ? (
@@ -224,15 +162,17 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
               <TopBar
                 title="Dieta"
                 onBackPress={() => setSubScreen("27_all_diets")}
-                rightAction="more"
+                rightAction="favorite"
+                favorited={isSelectedDietFavorited}
+                onRightPress={() => toggleFavoriteDiet(selectedDiet.id)}
               />
             </View>
           </View>
 
           <View style={styles.detailsBody}>
-            {/* Grade 2x2 de Nutrientes (184x100 cada) */}
+            {/* Grade 2x2 de Nutrientes */}
             <View style={styles.nutrientGrid}>
-              {DIET_DETAIL_MACROS.map((item) => (
+              {dietDetailMacros.map((item) => (
                 <View
                   key={item.name}
                   style={[styles.nutrientCard, { backgroundColor: item.bg }]}
@@ -240,40 +180,38 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
                   <AppText variant="title3" color={colors.grayscale[600]}>
                     {item.name}
                   </AppText>
-
-                  <View style={{ gap: 6 }}>
-                    <View style={styles.nutrientBarTrack}>
-                      <View
-                        style={[
-                          styles.nutrientBarFill,
-                          { width: `${item.progress * 100}%` },
-                        ]}
-                      />
-                    </View>
-                    <View style={styles.nutrientLabelsRow}>
-                      <AppText variant="footnote" color={colors.grayscale[600]}>
-                        {item.current}
-                      </AppText>
-                      <AppText variant="footnote" color={colors.grayscale[600]}>
-                        {item.max}
-                      </AppText>
-                    </View>
-                  </View>
+                  <AppText variant="largeTitle" color={colors.grayscale[600]}>
+                    {item.current}
+                  </AppText>
                 </View>
               ))}
             </View>
 
             {/* Título & Descrição Completa */}
             <View style={{ gap: 10 }}>
-              <AppText variant="title2" color={colors.grayscale[100]}>
-                {selectedDiet.title}
-              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <AppText variant="title2" color={colors.grayscale[100]}>
+                  {selectedDiet.title}
+                </AppText>
+                {selectedDiet.premium ? (
+                  <View style={styles.premiumTag}>
+                    <Sparkles size={11} color={colors.grayscale[600]} />
+                    <AppText
+                      variant="caption2"
+                      color={colors.grayscale[600]}
+                      style={{ fontWeight: "700" }}
+                    >
+                      PREMIUM
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
               <AppText variant="body2" color={colors.grayscale[200]}>
                 {selectedDiet.description}
               </AppText>
             </View>
 
-            {/* Goal Container (388x107 - #232220) */}
+            {/* Goal Container */}
             <View style={styles.goalCard}>
               <View style={styles.goalIconCircle}>
                 <ActionIcon
@@ -292,12 +230,32 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
               </View>
             </View>
 
-            <Button
-              title="Adicionar à Minha Dieta"
-              variant="primary"
-              size="large"
-              onPress={() => setSubScreen("30_my_diets_list")}
-            />
+            {/* Ações da Dieta */}
+            <View style={{ gap: 12 }}>
+              <Button
+                title={
+                  selectedDiet.premium && !isPremium && !isSelectedDietInMyDiets
+                    ? "Desbloquear com Premium"
+                    : isSelectedDietInMyDiets
+                    ? "Remover de Minhas Dietas"
+                    : "Adicionar à Minha Dieta"
+                }
+                variant={isSelectedDietInMyDiets ? "outline" : "primary"}
+                size="large"
+                onPress={() => handleToggleMyDietAction(selectedDiet)}
+              />
+
+              <Button
+                title={
+                  justLoggedMeal
+                    ? "✓ Refeição Registrada no Diário!"
+                    : "+ Registrar Refeição Deste Plano Hoje"
+                }
+                variant="secondary"
+                size="large"
+                onPress={handleLogDietSampleMeal}
+              />
+            </View>
           </View>
         </ScrollView>
       ) : (
@@ -317,11 +275,7 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
             <SegmentedTabs
               tabs={["Todas as Dietas", "Minhas Dietas"]}
               activeIndex={tabIndex}
-              onChange={(idx) =>
-                setSubScreen(
-                  idx === 0 ? "27_all_diets" : "30_my_diets_list"
-                )
-              }
+              onChange={handleSelectTab}
             />
 
             {/* TELA 27 — TODAS AS DIETAS */}
@@ -338,27 +292,44 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
                 </View>
 
                 <AppText variant="title2" color={colors.grayscale[100]}>
-                  Dietas
+                  Dietas ({DIET_CATALOG.length})
                 </AppText>
 
-                <View style={{ gap: 22 }}>
-                  {ALL_DIET_PLANS.map((plan) => (
-                    <DietCard
-                      key={plan.id}
-                      title={plan.title}
-                      calories={plan.calories}
-                      protein={plan.protein}
-                      carbs={plan.carbs}
-                      fat={plan.fat}
-                      imageUri={plan.imageUri}
-                      favorited={Boolean(favorites[plan.id])}
-                      onFavoriteToggle={() => toggleFav(plan.id)}
-                      onPress={() => {
-                        setSelectedDiet(plan);
-                        setSubScreen("28_diet_details");
-                      }}
-                    />
-                  ))}
+                <View style={{ gap: 20 }}>
+                  {DIET_CATALOG.map((plan) => {
+                    const isFav = account.favoriteDietIds.includes(plan.id);
+                    const isInMy = account.myDietIds.includes(plan.id);
+                    return (
+                      <View key={plan.id} style={{ position: "relative" }}>
+                        <DietCard
+                          title={plan.title}
+                          calories={plan.calories}
+                          protein={plan.protein}
+                          carbs={plan.carbs}
+                          fat={plan.fat}
+                          imageUri={plan.imageUri}
+                          favorited={isFav}
+                          onFavoriteToggle={() => toggleFavoriteDiet(plan.id)}
+                          onPress={() => {
+                            setSelectedDiet(plan);
+                            setSubScreen("28_diet_details");
+                          }}
+                        />
+                        {isInMy ? (
+                          <View style={styles.enrolledBadge}>
+                            <Check size={12} color={colors.grayscale[600]} />
+                            <AppText
+                              variant="caption2"
+                              color={colors.grayscale[600]}
+                              style={{ fontWeight: "700" }}
+                            >
+                              Adicionada
+                            </AppText>
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -385,30 +356,74 @@ export const DietsFlowScreenView: React.FC<DietsFlowScreenProps> = ({
                   Comece uma dieta personalizada para tornar seu acompanhamento
                   ainda mais fácil.
                 </AppText>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setSubScreen("27_all_diets")}
+                  style={styles.exploreBtn}
+                >
+                  <AppText variant="headline" color={colors.grayscale[600]}>
+                    Explorar Dietas
+                  </AppText>
+                </TouchableOpacity>
               </View>
             )}
 
             {/* TELA 30 — MINHAS DIETAS PREENCHIDA */}
             {subScreen === "30_my_diets_list" && (
-              <View style={{ gap: 22 }}>
-                {MY_DIET_PLANS.map((plan) => (
-                  <DietCard
-                    key={plan.id}
-                    title={plan.title}
-                    calories={plan.calories}
-                    protein={plan.protein}
-                    carbs={plan.carbs}
-                    fat={plan.fat}
-                    imageUri={plan.imageUri}
-                    favorited={Boolean(favorites[plan.id])}
-                    onFavoriteToggle={() => toggleFav(plan.id)}
-                    onPress={() => {
-                      setSelectedDiet(plan);
-                      setSubScreen("28_diet_details");
-                    }}
-                  />
-                ))}
-              </View>
+              <>
+                <View style={styles.purpleBanner}>
+                  <AppText variant="title3" color={colors.grayscale[600]}>
+                    Seus Planos em Andamento
+                  </AppText>
+                  <AppText variant="body2" color={colors.grayscale[600]}>
+                    Acompanhe os planos alimentares que você escolheu seguir.
+                  </AppText>
+                </View>
+
+                {myDiets.length === 0 ? (
+                  <View style={styles.emptyStateBox}>
+                    <UtensilsCrossed size={48} color={colors.accent[100]} />
+                    <AppText
+                      variant="body"
+                      color={colors.grayscale[200]}
+                      align="center"
+                    >
+                      Você ainda não adicionou nenhuma dieta a esta lista.
+                    </AppText>
+                    <TouchableOpacity
+                      onPress={() => setSubScreen("27_all_diets")}
+                      style={styles.exploreBtn}
+                    >
+                      <AppText variant="headline" color={colors.grayscale[600]}>
+                        Ver Todas as Dietas
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ gap: 20 }}>
+                    {myDiets.map((plan) => {
+                      const isFav = account.favoriteDietIds.includes(plan.id);
+                      return (
+                        <DietCard
+                          key={plan.id}
+                          title={plan.title}
+                          calories={plan.calories}
+                          protein={plan.protein}
+                          carbs={plan.carbs}
+                          fat={plan.fat}
+                          imageUri={plan.imageUri}
+                          favorited={isFav}
+                          onFavoriteToggle={() => toggleFavoriteDiet(plan.id)}
+                          onPress={() => {
+                            setSelectedDiet(plan);
+                            setSubScreen("28_diet_details");
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
+                )}
+              </>
             )}
           </ScrollView>
 
@@ -428,68 +443,20 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     width: "100%",
-    maxWidth: 428,
-    alignSelf: "center",
     backgroundColor: colors.grayscale[600],
-  },
-  subNavWrapper: {
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-  },
-  subNavScroll: {
-    gap: 6,
-    paddingVertical: 4,
-  },
-  subPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-  },
-  subPillActive: {
-    backgroundColor: colors.accent[200],
-    borderColor: colors.accent[200],
   },
   listScroll: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 110,
-    gap: 18,
+    gap: 20,
   },
   purpleBanner: {
     width: "100%",
-    minHeight: 128,
+    backgroundColor: colors.accent[100],
     borderRadius: radii.xl,
-    backgroundColor: colors.accent[100], // #DDC0FF
     padding: 20,
-    justifyContent: "center",
     gap: 6,
-  },
-  emptyStateBox: {
-    paddingVertical: 80,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  emptyCircle: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  floatingMenuWrapper: {
-    position: "absolute",
-    bottom: 14,
-    left: 0,
-    right: 0,
-    alignItems: "center",
   },
   detailsHeroBox: {
     width: "100%",
@@ -502,68 +469,98 @@ const styles = StyleSheet.create({
   },
   detailsTopBarOverlay: {
     position: "absolute",
-    top: 12,
+    top: 10,
     left: 20,
     right: 20,
   },
   detailsBody: {
-    marginTop: -24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: colors.grayscale[600],
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 18,
     gap: 20,
   },
   nutrientGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 14,
+    rowGap: 12,
   },
   nutrientCard: {
     width: "48%",
-    height: 100,
-    borderRadius: 20,
+    height: 90,
+    borderRadius: radii.xl,
     padding: 14,
     justifyContent: "space-between",
   },
-  nutrientBarTrack: {
-    width: "100%",
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(18,18,18,0.22)",
-    overflow: "hidden",
-  },
-  nutrientBarFill: {
-    height: "100%",
-    borderRadius: 3,
-    backgroundColor: colors.grayscale[600],
-  },
-  nutrientLabelsRow: {
+  premiumTag: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.accent[200],
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  enrolledBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.accent[300],
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
   },
   goalCard: {
     width: "100%",
-    minHeight: 107,
-    borderRadius: radii.xl,
     backgroundColor: colors.grayscale[500],
-    borderWidth: 1,
-    borderColor: colors.grayscale[400],
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    borderRadius: radii.xl,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: colors.grayscale[400],
   },
   goalIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.grayscale[400],
     alignItems: "center",
     justifyContent: "center",
   },
+  emptyStateBox: {
+    width: "100%",
+    paddingVertical: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+  },
+  emptyCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: colors.grayscale[500],
+    borderWidth: 1,
+    borderColor: colors.grayscale[400],
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  exploreBtn: {
+    marginTop: 8,
+    backgroundColor: colors.accent[200],
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: radii.full,
+  },
+  floatingMenuWrapper: {
+    position: "absolute",
+    bottom: 14,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
 });
-
